@@ -426,7 +426,7 @@
         if (tipo === 'lavanderia') {
           detalhes.innerHTML = `
             <label>Data:</label>
-            <input type="date" class="form-control mb-2" id="dataLavanderia" value="${hoje}">
+            <input type="date" class="form-control mb-2" id="dataLavanderia" value="${hoje}
             <label>Quantidade de lavagens:</label>
             <input type="number" class="form-control mb-2" id="qtdLavagens" min="0">
             <label>Quantidade de secagens:</label>
@@ -435,7 +435,7 @@
         } else if (tipo === 'carro') {
           detalhes.innerHTML = `
             <label>Data:</label>
-            <input type="date" class="form-control mb-2" id="dataCarro" value="${hoje}">
+            <input type="date" class="form-control mb-2" id="dataCarro" value="${hoje}
             <label>KM Inicial:</label>
             <input type="number" class="form-control mb-2" id="kmInicial" min="0">
             <label>KM Final:</label>
@@ -461,7 +461,7 @@
   registro.qtd = parseInt(qtd);
   registro.data = data;
   registro.cor  = cor;
-}">
+}
     <label>Tipo de cópia:</label>
     <select class="form-select mb-2" id="corXerox" required>
       <option value="pb">Preto e branco</option>
@@ -470,7 +470,7 @@
     <label>Quantidade de cópias:</label>
     <input type="number" class="form-control mb-2" id="qtdXerox" min="1">
   `;
-}">
+}
             <label>Quantidade de cópias:</label>
             <input type="number" class="form-control mb-2" id="qtdXerox" min="1">
           `;
@@ -582,19 +582,26 @@
           }
 
         } else if (tipo === 'xerox') {
-   const qtd = document.getElementById('qtdXerox').value;
-   const data = document.getElementById('dataXerox').value;
-   const cor  = document.getElementById('corXerox').value;
+  const qtd = document.getElementById('qtdXerox').value;
+  const data = document.getElementById('dataXerox').value;
+  const cor  = document.getElementById('corXerox').value;
 
-   if (!qtd)  return alert('Informe a quantidade de cópias.');
-   if (!data) return alert('Informe a data.');
-   if (!cor)  return alert('Selecione o tipo de cópia.');
+  if (!qtd)  return alert('Informe a quantidade de cópias.');
+  if (!data) return alert('Informe a data.');
+  if (!cor)  return alert('Selecione o tipo de cópia.');
 
-   registro.qtd = parseInt(qtd);
-   registro.data = data;
-   registro.cor  = cor;
- }
-    
+  registro.qtd = parseInt(qtd);
+  registro.data = data;
+  registro.cor  = cor;
+}
+    <label>Tipo de cópia:</label>
+    <select class="form-select mb-2" id="corXerox" required>
+      <option value="pb">Preto e branco</option>
+      <option value="colorida">Colorida</option>
+    </select>
+    <label>Quantidade de cópias:</label>
+    <input type="number" class="form-control mb-2" id="qtdXerox" min="1">
+  `;
 } else if (tipo === 'refeicoes') {
           const dias = [];
           let erro = false;
@@ -728,7 +735,7 @@
               <tr>
                 <td>${dataExib}</td>
                 <td>${(reg.tipo === 'xerox' && reg.cor)
-  ? 'Xerox (' + (reg.cor === 'colorida' ? 'Colorida' : 'P&B') + ')'
+  ? `Xerox (${reg.cor === 'colorida' ? 'Colorida' : 'P&B'})`
   : (reg.tipo || '')}</td>
                 <td>${detalhes}</td>
                 <td>
@@ -813,7 +820,7 @@
         <div id="edit-campoDepartamento" class="mb-2">
           ${registro.uso === 'departamento' ? `
             <label>Departamento:</label>
-            <input type="text" class="form-control mb-2" id="edit-departamento" value="${registro.departamento || ''}">
+            <input type="text" class="form-control mb-2" id="edit-departamento" value="${registro.departamento || ''}
           ` : ''}
         </div>
         <label>Quantidade de uso da TAG:</label>
@@ -835,9 +842,9 @@
     case 'hospedagem':
       html += `
         <label>Data de entrada:</label>
-        <input type="date" class="form-control mb-2" id="edit-entrada" value="${registro.entrada || ''}">
+        <input type="date" class="form-control mb-2" id="edit-entrada" value="${registro.entrada || ''}
         <label>Data de saída:</label>
-        <input type="date" class="form-control mb-2" id="edit-saida" value="${registro.saida || ''}">
+        <input type="date" class="form-control mb-2" id="edit-saida" value="${registro.saida || ''}
         <div id="edit-erroData" class="text-danger"></div>
       `;
       break;
@@ -870,7 +877,7 @@
       if (this.value === 'departamento') {
         campo.innerHTML = `
           <label>Departamento:</label>
-          <input type="text" class="form-control mb-2" id="edit-departamento" value="${registro.departamento || ''}">
+          <input type="text" class="form-control mb-2" id="edit-departamento" value="${registro.departamento || ''}
         `;
       } else {
         campo.innerHTML = '';
@@ -1547,6 +1554,3 @@ document.getElementById('btnEsqueceuSenha')?.addEventListener('click', async fun
 </div>
 </body>
 </html>
-
-
-
