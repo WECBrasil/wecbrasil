@@ -453,7 +453,12 @@
           detalhes.innerHTML = `
             <label>Data:</label>
             <input type="date" class="form-control mb-2" id="dataCópias e Impressões" value="${hoje}">
-            <label>Quantidade de cópias:</label>
+            <label>Tipo de cópia:</label>
+    <select class=\"form-select mb-2\" id=\"tipo-copias\">
+      <option value=\"pb\">Preto e branco</option>
+      <option value=\"color\">Colorida</option>
+    </select>
+    <label>Quantidade de cópias:</label>
             <input type="number" class="form-control mb-2" id="qtdCópias e Impressões" min="1">
           `;
         } else if (tipo === 'refeicoes') {
@@ -571,6 +576,7 @@
           if (!data) return alert('Informe a data.');
 
           registro.qtd = parseInt(qtd);
+  registro.tipo_copias = document.getElementById('tipo-copias').value;
           registro.data = data;
 
         } else if (tipo === 'refeicoes') {
