@@ -657,30 +657,31 @@
             return res.join(' · ') || '-';
           }
           case 'xerox': {
-  const qtd = Number(reg.qtd) || 0;
-  const tipoImp = reg.impressao_tipo === 'colorida' ? 'Colorida' : (reg.impressao_tipo === 'preto_branco' ? 'Preto e Branco' : null);
-  let res = [];
-  if (qtd) res.push(`Cópias: ${qtd}`);
-  if (tipoImp) res.push(tipoImp);
-  return res.join(' · ') || '-';
-}
+            const qtd = Number(reg.qtd) || 0;
+            const tipoImp = reg.impressao_tipo === 'colorida' ? 'Colorida' : (reg.impressao_tipo === 'preto_branco' ? 'Preto e Branco' : null);
+            let res = [];
+            if (qtd) res.push(`Cópias: ${qtd}`);
+            if (tipoImp) res.push(tipoImp);
+            return res.join(' · ') || '-';
+          }
           break;
-      case 'refeicoes':
-        (reg.dias || []).forEach(dia => {
-          const data = new Date(dia.data);
-          if ((inicio && data < inicio) || (fim && data > fim)) return;
-          resumo[nome].refeicoes += parseInt(dia.qtd) || 0;
-        });
-        break;
-      case 'hospedagem':
-        const entrada = new Date(reg.entrada);
-        const saida = new Date(reg.saida);
-        if ((inicio && saida < inicio) || (fim && entrada > fim)) return;
-        const dias = Math.ceil((saida - entrada) / (1000 * 60 * 60 * 24));
-        if (dias > 0) resumo[nome].hospedagemDias += dias;
-        break;
-    }
-  });
+          case 'refeicoes':
+            (reg.dias || []).forEach(dia => {
+              const data = new Date(dia.data);
+              if ((inicio && data < inicio) || (fim && data > fim)) return;
+              resumo[nome].refeicoes += parseInt(dia.qtd) || 0;
+          });
+          break;
+      
+          case 'hospedagem':
+            const entrada = new Date(reg.entrada);
+            const saida = new Date(reg.saida);
+            if ((inicio && saida < inicio) || (fim && entrada > fim)) return;
+            const dias = Math.ceil((saida - entrada) / (1000 * 60 * 60 * 24));
+            if (dias > 0) resumo[nome].hospedagemDias += dias;
+            break;
+          }
+      });
       
   let texto = '';
   for (let nome in resumo) {
@@ -1153,6 +1154,7 @@ document.getElementById('btnEsqueceuSenha')?.addEventListener('click', async fun
 </div>
 </body>
 </html>
+
 
 
 
