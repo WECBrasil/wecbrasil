@@ -735,7 +735,7 @@
               <tr>
                 <td>${dataExib}</td>
                 <td>${(reg.tipo === 'xerox' && reg.cor)
-  ? `Xerox (${reg.cor === 'colorida' ? 'Colorida' : 'P&B'})`
+  ? 'Xerox (' + (reg.cor === 'colorida' ? 'Colorida' : 'P&B') + ')'
   : (reg.tipo || '')}</td>
                 <td>${detalhes}</td>
                 <td>
@@ -1554,3 +1554,4 @@ document.getElementById('btnEsqueceuSenha')?.addEventListener('click', async fun
 </div>
 </body>
 </html>
+
