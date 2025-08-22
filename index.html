@@ -103,7 +103,7 @@
             <option value="">Selecione</option>
             <option value="lavanderia">Lavanderia</option>
             <option value="carro">Uso do Carro</option>
-            <option value="xerox">Cópias e Impressões</option>
+            <option value="xerox">Xerox</option>
             <option value="refeicoes">Refeições</option>
             <option value="hospedagem">Hospedagem</option>
           </select>
@@ -450,19 +450,13 @@
             <input type="number" class="form-control mb-2" id="qtdTag" min="0">
           `;
         } else if (tipo === 'xerox') {
-    detalhes.innerHTML = `
-      <label>Data:</label>
-      <input type="date" class="form-control mb-2" id="dataXerox">
-      <label>Tipo de impressão:</label>
-      <select id="tipoImpressao" class="form-select mb-2" required>
-        <option value="">Selecione</option>
-        <option value="preto_branco">Preto e Branco</option>
-        <option value="colorida">Colorida</option>
-      </select>
-      <label>Quantidade de cópias:</label>
-      <input type="number" class="form-control mb-2" id="qtdXerox" placeholder="Quantidade" min="1">
-    `;
-  } else if (tipo === 'refeicoes') {
+          detalhes.innerHTML = `
+            <label>Data:</label>
+            <input type="date" class="form-control mb-2" id="dataXerox" value="${hoje}">
+            <label>Quantidade de cópias:</label>
+            <input type="number" class="form-control mb-2" id="qtdXerox" min="1">
+          `;
+        } else if (tipo === 'refeicoes') {
           detalhes.innerHTML = `
             <label>Selecionar dias e quantidades:</label>
             <div id="diasRefeicoes" class="mb-2"></div>
@@ -579,13 +573,7 @@
           registro.qtd = parseInt(qtd);
           registro.data = data;
 
-          const tipoImpressao = document.getElementById('tipoImpressao').value;
-  if (!tipoImpressao) return alert('Selecione o tipo de impressão.');
-
-  registro.qtd = parseInt(qtd);
-  registro.impressao_tipo = tipoImpressao;
-  registro.data = data;
-} else if (tipo === 'refeicoes') {
+        } else if (tipo === 'refeicoes') {
           const dias = [];
           let erro = false;
 
@@ -657,32 +645,393 @@
             return res.join(' · ') || '-';
           }
           case 'xerox': {
-            const qtd = Number(reg.qtd) || 0;
-            const tipoImp = reg.impressao_tipo === 'colorida' ? 'Colorida' : (reg.impressao_tipo === 'preto_branco' ? 'Preto e Branco' : null);
+            if (reg.qtd) return `Cópias: ${reg.qtd}`;
+            return '-';
+          }
+          case 'refeicoes': {
+            if (!Array.isArray(reg.dias) || reg.dias.length === 0) return 'Refeições (detalhes não disponíveis)';
+            return reg.dias
+              .filter(d => d.qtd)
+              .map(d => `${formatDateISOtoBR(d.data)} x${d.qtd}`)
+              .join(' · ') || '-';
+          }
+          case 'hospedagem': {
+            const entrada = reg.entrada ? formatDateISOtoBR(reg.entrada) : null;
+            const saida = reg.saida ? formatDateISOtoBR(reg.saida) : null;
             let res = [];
-            if (qtd) res.push(`Cópias: ${qtd}`);
-            if (tipoImp) res.push(tipoImp);
+            if (entrada) res.push(`Entrada: ${entrada}`);
+            if (saida) res.push(`Saída: ${saida}`);
             return res.join(' · ') || '-';
           }
-          break;
-          case 'refeicoes':
-            (reg.dias || []).forEach(dia => {
-              const data = new Date(dia.data);
-              if ((inicio && data < inicio) || (fim && data > fim)) return;
-              resumo[nome].refeicoes += parseInt(dia.qtd) || 0;
-          });
-          break;
-      
-          case 'hospedagem':
-            const entrada = new Date(reg.entrada);
-            const saida = new Date(reg.saida);
-            if ((inicio && saida < inicio) || (fim && entrada > fim)) return;
-            const dias = Math.ceil((saida - entrada) / (1000 * 60 * 60 * 24));
-            if (dias > 0) resumo[nome].hospedagemDias += dias;
-            break;
+          default:
+            return reg.descricao || '-';
+        }
+      }
+
+      async function carregarListaRegistros(limite = 5, verTodos = false) {
+        try {
+          const { data: userData, error: userError } = await supabase.auth.getUser();
+          if (userError) throw userError;
+          const user = userData?.user || null;
+
+          let query = supabase
+            .from('registros')
+            .select('*')
+            .order('data', { ascending: false });
+
+          if (!verTodos && user) query = query.eq('user_id', user.id);
+          if (limite != null && Number(limite) > 0) query = query.limit(Number(limite));
+
+          const { data, error } = await query;
+          if (error) throw error;
+
+          listaCache = data || [];
+
+          const tbody = document.getElementById('listaRegistros');
+          if (!listaCache.length) {
+            tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted">Nenhum registro encontrado.</td></tr>`;
+            document.getElementById('btnVerTodos')?.classList.toggle('hidden', !(limite != null && Number(limite) > 0));
+            return;
           }
+
+          const rows = listaCache.map(reg => {
+            const dataExib = reg.data
+              ? new Date(String(reg.data) + 'T00:00:00').toLocaleDateString('pt-BR', { timeZone: 'UTC' })
+              : 'Sem data';
+            const detalhes = gerarDescricaoDetalhada(reg).replace(/</g, '&lt;');
+            return `
+              <tr>
+                <td>${dataExib}</td>
+                <td>${reg.tipo || ''}</td>
+                <td>${detalhes}</td>
+                <td>
+                  <button class="btn btn-sm btn-warning me-1" onclick="editarRegistro('${String(reg.id)}')">Editar</button>
+                  <button class="btn btn-sm btn-danger" onclick="excluirRegistroSupabase('${String(reg.id)}')">Excluir</button>
+                </td>
+              </tr>
+            `;
+          }).join('');
+
+          tbody.innerHTML = rows;
+
+          document.getElementById('btnVerTodos')?.classList.toggle('hidden', !(limite != null && Number(limite) > 0));
+        } catch (err) {
+          console.error('Erro ao carregar registros:', err);
+          document.getElementById('listaRegistros').innerHTML =
+            `<tr><td colspan="4" class="text-center text-danger">Erro ao carregar registros: ${err.message || err}</td></tr>`;
+        }
+      }
+
+      document.getElementById('btnVerTodos').addEventListener('click', () => {
+        carregarListaRegistros(null, true);
       });
-      
+
+      async function excluirRegistroSupabase(id) {
+        if (!confirm('Tem certeza que deseja excluir este registro?')) return;
+
+        const { error } = await supabase
+          .from('registros')
+          .delete()
+          .eq('id', id);
+
+        if (error) {
+          console.error('Erro ao excluir registro:', error);
+          alert('Erro ao excluir registro: ' + (error.message || error));
+        } else {
+          alert('Registro excluído com sucesso.');
+          carregarListaRegistros();
+        }
+      }
+
+      async function editarRegistro(id) {
+  const registro = listaCache.find(r => String(r.id) === String(id));
+  if (!registro) {
+    alert('Registro não encontrado.');
+    return;
+  }
+  registroEditando = registro;
+  document.getElementById('edit-id').value = registro.id;
+
+  // Monta os campos conforme o tipo
+  const container = document.getElementById('camposEdicaoServico');
+  const tipo = registro.tipo;
+
+  let html = `<label class="form-label">Tipo</label>
+    <input type="text" class="form-control mb-2" id="edit-tipo" value="${tipo}" disabled>`;
+
+  switch(tipo) {
+    case 'lavanderia':
+      html += `
+        <label>Data:</label>
+        <input type="date" class="form-control mb-2" id="edit-data" value="${registro.data || ''}" required>
+        <label>Quantidade de lavagens:</label>
+        <input type="number" class="form-control mb-2" id="edit-qtdLavagens" value="${registro.qtdlavagens || 0}" min="0">
+        <label>Quantidade de secagens:</label>
+        <input type="number" class="form-control mb-2" id="edit-qtdSecagens" value="${registro.qtdsecagens || 0}" min="0">
+      `;
+      break;
+    case 'carro':
+      html += `
+        <label>Data:</label>
+        <input type="date" class="form-control mb-2" id="edit-data" value="${registro.data || ''}" required>
+        <label>KM Inicial:</label>
+        <input type="number" class="form-control mb-2" id="edit-kmInicial" value="${registro.kminicial || 0}" min="0">
+        <label>KM Final:</label>
+        <input type="number" class="form-control mb-2" id="edit-kmFinal" value="${registro.kmfinal || 0}" min="0">
+        <label>Uso:</label>
+        <select class="form-select mb-2" id="edit-usoCarro">
+          <option value="pessoal" ${registro.uso === 'pessoal' ? 'selected' : ''}>Pessoal</option>
+          <option value="departamento" ${registro.uso === 'departamento' ? 'selected' : ''}>Departamento</option>
+        </select>
+        <div id="edit-campoDepartamento" class="mb-2">
+          ${registro.uso === 'departamento' ? `
+            <label>Departamento:</label>
+            <input type="text" class="form-control mb-2" id="edit-departamento" value="${registro.departamento || ''}">
+          ` : ''}
+        </div>
+        <label>Quantidade de uso da TAG:</label>
+        <input type="number" class="form-control mb-2" id="edit-qtdTag" value="${registro.qtdtag || 0}" min="0">
+      `;
+      break;
+    case 'xerox':
+      html += `
+        <label>Data:</label>
+        <input type="date" class="form-control mb-2" id="edit-data" value="${registro.data || ''}" required>
+        <label>Quantidade de cópias:</label>
+        <input type="number" class="form-control mb-2" id="edit-qtdXerox" value="${registro.qtd || 0}" min="1">
+      `;
+      break;
+    case 'refeicoes':
+      html += `<div id="edit-refeicoesDias"></div>
+      <button type="button" class="btn btn-outline-primary btn-sm mb-2" onclick="adicionarDiaRefeicaoEdicao()">Adicionar Dia</button>`;
+      break;
+    case 'hospedagem':
+      html += `
+        <label>Data de entrada:</label>
+        <input type="date" class="form-control mb-2" id="edit-entrada" value="${registro.entrada || ''}">
+        <label>Data de saída:</label>
+        <input type="date" class="form-control mb-2" id="edit-saida" value="${registro.saida || ''}">
+        <div id="edit-erroData" class="text-danger"></div>
+      `;
+      break;
+    default:
+      html += `<div class="alert alert-warning">Tipo de serviço desconhecido para edição.</div>`;
+  }
+  container.innerHTML = html;
+
+  // Especial para refeições: renderize os dias existentes
+  if (tipo === 'refeicoes' && Array.isArray(registro.dias)) {
+    const refeicoesContainer = document.getElementById('edit-refeicoesDias');
+    registro.dias.forEach(dia => {
+      const linha = document.createElement('div');
+      linha.classList.add('mb-2', 'edit-linha-dia');
+      linha.innerHTML = `
+        <div class="d-flex align-items-center">
+          <input type="date" class="form-control me-2 edit-data-refeicao" value="${dia.data}" required>
+          <input type="number" class="form-control edit-qtd-refeicao" placeholder="Quantidade" min="1" value="${dia.qtd}" required>
+          <button type="button" class="btn btn-danger btn-sm ms-2" onclick="this.parentElement.parentElement.remove()">X</button>
+        </div>
+      `;
+      refeicoesContainer.appendChild(linha);
+    });
+  }
+
+  // Departamento dinâmico: atualize ao mudar o uso
+  if (tipo === 'carro') {
+    document.getElementById('edit-usoCarro').addEventListener('change', function() {
+      const campo = document.getElementById('edit-campoDepartamento');
+      if (this.value === 'departamento') {
+        campo.innerHTML = `
+          <label>Departamento:</label>
+          <input type="text" class="form-control mb-2" id="edit-departamento" value="${registro.departamento || ''}">
+        `;
+      } else {
+        campo.innerHTML = '';
+      }
+    });
+  }
+
+  // Mostra o modal
+  const modalEl = document.getElementById('modalEditarRegistro');
+  const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+  modal.show();
+}
+
+// Adicionar novo dia de refeições no modo edição
+function adicionarDiaRefeicaoEdicao() {
+  const diasContainer = document.getElementById('edit-refeicoesDias');
+  const novoDia = document.createElement('div');
+  novoDia.classList.add('mb-2', 'edit-linha-dia');
+  novoDia.innerHTML = `
+    <div class="d-flex align-items-center">
+      <input type="date" class="form-control me-2 edit-data-refeicao" required>
+      <input type="number" class="form-control edit-qtd-refeicao" placeholder="Quantidade" min="1" required>
+      <button type="button" class="btn btn-danger btn-sm ms-2" onclick="this.parentElement.parentElement.remove()">X</button>
+    </div>
+  `;
+  diasContainer.appendChild(novoDia);
+}
+
+      async function salvarEdicao() {
+  const id = document.getElementById('edit-id').value;
+  const tipo = registroEditando.tipo; // O tipo não muda!
+  let payload = {};
+  let valid = true;
+
+  switch(tipo) {
+    case 'lavanderia':
+      payload = {
+        data: document.getElementById('edit-data').value,
+        qtdlavagens: Number(document.getElementById('edit-qtdLavagens').value),
+        qtdsecagens: Number(document.getElementById('edit-qtdSecagens').value)
+      };
+      if (!payload.data) valid = false;
+      break;
+    case 'carro':
+      payload = {
+        data: document.getElementById('edit-data').value,
+        kminicial: Number(document.getElementById('edit-kmInicial').value),
+        kmfinal: Number(document.getElementById('edit-kmFinal').value),
+        uso: document.getElementById('edit-usoCarro').value,
+        qtdtag: Number(document.getElementById('edit-qtdTag').value)
+      };
+      if (payload.uso === 'departamento') {
+        payload.departamento = document.getElementById('edit-departamento').value;
+      }
+      if (!payload.data) valid = false;
+      break;
+    case 'xerox':
+      payload = {
+        data: document.getElementById('edit-data').value,
+        qtd: Number(document.getElementById('edit-qtdXerox').value)
+      };
+      if (!payload.data) valid = false;
+      break;
+    case 'refeicoes':
+      const dias = [];
+      document.querySelectorAll('.edit-linha-dia').forEach(el => {
+        const data = el.querySelector('.edit-data-refeicao').value;
+        const qtd = el.querySelector('.edit-qtd-refeicao').value;
+        if (data && qtd) dias.push({ data, qtd: Number(qtd) });
+      });
+      payload = { dias };
+      if (dias.length === 0) valid = false;
+      break;
+    case 'hospedagem':
+      payload = {
+        entrada: document.getElementById('edit-entrada').value,
+        saida: document.getElementById('edit-saida').value
+      };
+      if (!payload.entrada || !payload.saida) valid = false;
+      break;
+    default:
+      valid = false;
+  }
+
+  if (!valid) {
+    alert('Preencha todos os campos obrigatórios.');
+    return;
+  }
+
+  // Atualize via Supabase
+  const { error } = await supabase
+    .from('registros')
+    .update(payload)
+    .eq('id', id);
+
+  if (error) {
+    alert('Erro ao atualizar: ' + error.message);
+    return;
+  }
+
+  bootstrap.Modal.getInstance(document.getElementById('modalEditarRegistro')).hide();
+  alert('Registro atualizado com sucesso!');
+  carregarListaRegistros();
+};
+
+      supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          verificarLogin();
+          carregarListaRegistros();
+        } else if (event === 'SIGNED_OUT') {
+          document.getElementById('listaRegistros').innerHTML =
+            `<tr><td colspan="4" class="text-center text-muted">Faça login para ver seus registros.</td></tr>`;
+        }
+      });
+
+async function gerarRelatorio() {
+  const dataInicial = document.getElementById('dataInicial').value;
+  const dataFinal = document.getElementById('dataFinal').value;
+  const dataInicialISO = dataInicial.includes('/') ? dataBRParaISO(dataInicial) : dataInicial;
+  const dataFinalISO = dataFinal.includes('/') ? dataBRParaISO(dataFinal) : dataFinal;
+  const inicio = dataInicialISO ? new Date(dataInicialISO) : null;
+  const fim = dataFinalISO ? new Date(dataFinalISO) : null;
+  const { data: registros, error } = await supabase
+   .from('registros')
+   .select('*')
+   .gte('data', dataInicialISO || '1900-01-01')
+   .lte('data', dataFinalISO || '2999-12-31');
+  if (error) {
+    console.error('Erro ao buscar registros:', error);
+    document.getElementById('relatorio').textContent = 'Erro ao gerar relatório.';
+    return;
+  }
+  if (!registros || registros.length === 0) {
+    document.getElementById('relatorio').textContent = 'Nenhum registro encontrado no período selecionado.';
+    return;
+  }
+  const resumo = {};
+  registros.forEach(reg => {
+    const nome = reg.nome || reg.user_id;
+    if (!resumo[nome]) {
+      resumo[nome] = {
+        lavanderia: 0,
+        carroPessoal: 0,
+        carroDepartamento: {},
+        carroTag: 0,
+        carroTagPorDepartamento: {},
+        xerox: 0,
+        refeicoes: 0,
+        hospedagemDias: 0
+      };
+    }
+    switch (reg.tipo) {
+      case 'lavanderia':
+        resumo[nome].lavanderia += parseInt(reg.qtdlavagens) || 0;
+        break;
+      case 'carro':
+        const qtdTag = parseInt(reg.qtdtag) || 0;
+        const kmInicial = parseInt(reg.kminicial) || 0;
+        const kmFinal = parseInt(reg.kmfinal) || 0;
+        const km = kmFinal - kmInicial;
+        if (reg.uso === 'departamento') {
+          const depto = reg.departamento || 'Não especificado';
+          resumo[nome].carroDepartamento[depto] = (resumo[nome].carroDepartamento[depto] || 0) + km;
+          resumo[nome].carroTagPorDepartamento[depto] = (resumo[nome].carroTagPorDepartamento[depto] || 0) + qtdTag;
+        } else {
+          resumo[nome].carroPessoal += km;
+          resumo[nome].carroTag += qtdTag;
+        }
+        break;
+      case 'xerox':
+        resumo[nome].xerox += parseInt(reg.qtd) || 0;
+        break;
+      case 'refeicoes':
+        (reg.dias || []).forEach(dia => {
+          const data = new Date(dia.data);
+          if ((inicio && data < inicio) || (fim && data > fim)) return;
+          resumo[nome].refeicoes += parseInt(dia.qtd) || 0;
+        });
+        break;
+      case 'hospedagem':
+        const entrada = new Date(reg.entrada);
+        const saida = new Date(reg.saida);
+        if ((inicio && saida < inicio) || (fim && entrada > fim)) return;
+        const dias = Math.ceil((saida - entrada) / (1000 * 60 * 60 * 24));
+        if (dias > 0) resumo[nome].hospedagemDias += dias;
+        break;
+    }
+  });
   let texto = '';
   for (let nome in resumo) {
     const r = resumo[nome];
@@ -700,7 +1049,7 @@
       }
     }
     texto += `- Lavanderia: ${r.lavanderia} lavagem(ns)\n`;
-    texto += `- Cópias e Impressões (Preto e Branco): ${r.xerox} cópia(s)\n`;
+    texto += `- Xerox: ${r.xerox} cópia(s)\n`;
     texto += `- Refeições: ${r.refeicoes} refeição(ões)\n`;
     texto += `- Hospedagem: ${r.hospedagemDias} dia(s)\n\n`;
   }
@@ -1154,7 +1503,3 @@ document.getElementById('btnEsqueceuSenha')?.addEventListener('click', async fun
 </div>
 </body>
 </html>
-
-
-
-
