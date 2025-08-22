@@ -582,26 +582,19 @@
           }
 
         } else if (tipo === 'xerox') {
-  const qtd = document.getElementById('qtdXerox').value;
-  const data = document.getElementById('dataXerox').value;
-  const cor  = document.getElementById('corXerox').value;
+   const qtd = document.getElementById('qtdXerox').value;
+   const data = document.getElementById('dataXerox').value;
+   const cor  = document.getElementById('corXerox').value;
 
-  if (!qtd)  return alert('Informe a quantidade de cópias.');
-  if (!data) return alert('Informe a data.');
-  if (!cor)  return alert('Selecione o tipo de cópia.');
+   if (!qtd)  return alert('Informe a quantidade de cópias.');
+   if (!data) return alert('Informe a data.');
+   if (!cor)  return alert('Selecione o tipo de cópia.');
 
-  registro.qtd = parseInt(qtd);
-  registro.data = data;
-  registro.cor  = cor;
-}
-    <label>Tipo de cópia:</label>
-    <select class="form-select mb-2" id="corXerox" required>
-      <option value="pb">Preto e branco</option>
-      <option value="colorida">Colorida</option>
-    </select>
-    <label>Quantidade de cópias:</label>
-    <input type="number" class="form-control mb-2" id="qtdXerox" min="1">
-  `;
+   registro.qtd = parseInt(qtd);
+   registro.data = data;
+   registro.cor  = cor;
+ }
+    
 } else if (tipo === 'refeicoes') {
           const dias = [];
           let erro = false;
@@ -1554,5 +1547,6 @@ document.getElementById('btnEsqueceuSenha')?.addEventListener('click', async fun
 </div>
 </body>
 </html>
+
 
 
