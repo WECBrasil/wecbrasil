@@ -103,7 +103,7 @@
             <option value="">Selecione</option>
             <option value="lavanderia">Lavanderia</option>
             <option value="carro">Uso do Carro</option>
-            <option value="xerox">Xerox</option>
+            <option value="copias">Cópias e Impressões</option>
             <option value="refeicoes">Refeições</option>
             <option value="hospedagem">Hospedagem</option>
           </select>
@@ -449,12 +449,17 @@
             <label>Quantidade de uso da TAG:</label>
             <input type="number" class="form-control mb-2" id="qtdTag" min="0">
           `;
-        } else if (tipo === 'xerox') {
+        } else if (tipo === 'copias') {
           detalhes.innerHTML = `
             <label>Data:</label>
-            <input type="date" class="form-control mb-2" id="dataXerox" value="${hoje}">
-            <label>Quantidade de cópias:</label>
-            <input type="number" class="form-control mb-2" id="qtdXerox" min="1">
+            <input type="date" class="form-control mb-2" id="dataCopias" value="${hoje}">
+            <label>Quantidade:</label>
+            <input type="number" class="form-control mb-2" id="qtdCopias" min="1">
+            <label>Tipo de impressão:</label>
+            <select class="form-select mb-2" id="tipoImpressao">
+              <option value="preto">Preto e Branco</option>
+              <option value="colorida">Colorida</option>
+            </select>
           `;
         } else if (tipo === 'refeicoes') {
           detalhes.innerHTML = `
@@ -563,16 +568,17 @@
             registro.departamento = departamento;
           }
 
-        } else if (tipo === 'xerox') {
-          const qtd = document.getElementById('qtdXerox').value;
-          const data = document.getElementById('dataXerox').value;
+        } else if (tipo === 'copias') {
+          const qtd = document.getElementById('qtdCopias').value;
+          const data = document.getElementById('dataCopias').value;
+          const tipoImpressao = document.getElementById('tipoImpressao').value;
 
-          if (!qtd) return alert('Informe a quantidade de cópias.');
+          if (!qtd) return alert('Informe a quantidade.');
           if (!data) return alert('Informe a data.');
 
           registro.qtd = parseInt(qtd);
+          registro.tipoimpressao = tipoImpressao;
           registro.data = data;
-
         } else if (tipo === 'refeicoes') {
           const dias = [];
           let erro = false;
@@ -644,9 +650,13 @@
             if (reg.qtdtag) res.push(`TAGs: ${reg.qtdtag}`);
             return res.join(' · ') || '-';
           }
-          case 'xerox': {
-            if (reg.qtd) return `Cópias: ${reg.qtd}`;
-            return '-';
+          case 'copias': {
+            let desc = [];
+            if (reg.qtd) desc.push(`Qtd: ${reg.qtd}`);
+            if (reg.tipoimpressao) {
+              desc.push(`Tipo: ${reg.tipoimpressao === 'preto' ? 'Preto e Branco' : 'Colorida'}`);
+            }
+            return desc.join(' · ') || '-';
           }
           case 'refeicoes': {
             if (!Array.isArray(reg.dias) || reg.dias.length === 0) return 'Refeições (detalhes não disponíveis)';
@@ -793,14 +803,19 @@
         <input type="number" class="form-control mb-2" id="edit-qtdTag" value="${registro.qtdtag || 0}" min="0">
       `;
       break;
-    case 'xerox':
-      html += `
-        <label>Data:</label>
-        <input type="date" class="form-control mb-2" id="edit-data" value="${registro.data || ''}" required>
-        <label>Quantidade de cópias:</label>
-        <input type="number" class="form-control mb-2" id="edit-qtdXerox" value="${registro.qtd || 0}" min="1">
-      `;
-      break;
+    case 'copias':
+  html += `
+    <label>Data:</label>
+    <input type="date" class="form-control mb-2" id="edit-data" value="${registro.data || ''}" required>
+    <label>Quantidade:</label>
+    <input type="number" class="form-control mb-2" id="edit-qtdCopias" value="${registro.qtd || 0}" min="1">
+    <label>Tipo de impressão:</label>
+    <select class="form-select mb-2" id="edit-tipoImpressao">
+      <option value="preto" ${registro.tipoimpressao === 'preto' ? 'selected' : ''}>Preto e Branco</option>
+      <option value="colorida" ${registro.tipoimpressao === 'colorida' ? 'selected' : ''}>Colorida</option>
+    </select>
+  `;
+  break;
     case 'refeicoes':
       html += `<div id="edit-refeicoesDias"></div>
       <button type="button" class="btn btn-outline-primary btn-sm mb-2" onclick="adicionarDiaRefeicaoEdicao()">Adicionar Dia</button>`;
@@ -900,13 +915,14 @@ function adicionarDiaRefeicaoEdicao() {
       }
       if (!payload.data) valid = false;
       break;
-    case 'xerox':
-      payload = {
-        data: document.getElementById('edit-data').value,
-        qtd: Number(document.getElementById('edit-qtdXerox').value)
-      };
-      if (!payload.data) valid = false;
-      break;
+    case 'copias':
+  payload = {
+    data: document.getElementById('edit-data').value,
+    qtd: Number(document.getElementById('edit-qtdCopias').value),
+    tipoimpressao: document.getElementById('edit-tipoImpressao').value
+  };
+  if (!payload.data) valid = false;
+  break;
     case 'refeicoes':
       const dias = [];
       document.querySelectorAll('.edit-linha-dia').forEach(el => {
@@ -990,7 +1006,8 @@ async function gerarRelatorio() {
         carroDepartamento: {},
         carroTag: 0,
         carroTagPorDepartamento: {},
-        xerox: 0,
+        copiasPreto: 0,
+        copiasColorida: 0,
         refeicoes: 0,
         hospedagemDias: 0
       };
@@ -1013,8 +1030,12 @@ async function gerarRelatorio() {
           resumo[nome].carroTag += qtdTag;
         }
         break;
-      case 'xerox':
-        resumo[nome].xerox += parseInt(reg.qtd) || 0;
+      case 'copias':
+        if (reg.tipoimpressao === 'preto') {
+          resumo[nome].copiasPreto += parseInt(reg.qtd) || 0;
+        } else if (reg.tipoimpressao === 'colorida') {
+          resumo[nome].copiasColorida += parseInt(reg.qtd) || 0;
+        }
         break;
       case 'refeicoes':
         (reg.dias || []).forEach(dia => {
@@ -1049,7 +1070,8 @@ async function gerarRelatorio() {
       }
     }
     texto += `- Lavanderia: ${r.lavanderia} lavagem(ns)\n`;
-    texto += `- Xerox: ${r.xerox} cópia(s)\n`;
+    texto += `- Cópias (Preto e Branco): ${r.copiasPreto} cópia(s)\n`;
+    texto += `- Cópias (Coloridas): ${r.copiasColorida} cópia(s)\n`;
     texto += `- Refeições: ${r.refeicoes} refeição(ões)\n`;
     texto += `- Hospedagem: ${r.hospedagemDias} dia(s)\n\n`;
   }
