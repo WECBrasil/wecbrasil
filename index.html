@@ -19,23 +19,27 @@
       <h1 class="fs-4">Registro de Serviços</h1>
     </header>
 
-    <!-- Login -->
-    <div class="card mb-4" id="loginCard">
-      <div class="card-header">Login</div>
-      <div class="card-body">
-        <form id="formLogin">
-          <input type="text" class="form-control mb-2" id="loginUsuario" placeholder="Email" required>
-          <div class="input-group mb-2">
-            <input type="password" class="form-control" id="loginSenha" placeholder="Senha" required>
-          </div>
-          <button type="submit" class="btn btn-primary">Entrar</button>
-        </form>
-        <div class="mt-3">
-          <span>Não tem conta?</span>
-          <button class="btn btn-link p-0" id="btnMostrarCadastro">Cadastre-se</button>
-        </div>
+    <!-- Trecho do Login (alterado) -->
+<div class="card mb-4" id="loginCard">
+  <div class="card-header">Login</div>
+  <div class="card-body">
+    <form id="formLogin">
+      <input type="text" class="form-control mb-2" id="loginUsuario" placeholder="Email" required>
+      <div class="input-group mb-2">
+        <input type="password" class="form-control" id="loginSenha" placeholder="Senha" required>
       </div>
+      <button type="submit" class="btn btn-primary">Entrar</button>
+    </form>
+    <div class="mt-3">
+      <span>Não tem conta?</span>
+      <button class="btn btn-link p-0" id="btnMostrarCadastro">Cadastre-se</button>
     </div>
+    <!-- Novo botão Esqueceu a senha -->
+    <div class="mt-2">
+      <button class="btn btn-link p-0" id="btnEsqueceuSenha">Esqueceu a senha?</button>
+    </div>
+  </div>
+</div>
 
     <!-- Cadastro individual -->
     <div class="card mb-4 hidden" id="cadastroIndividualCard">
@@ -1460,6 +1464,23 @@ document.getElementById('formMissionario').addEventListener('submit', async func
   const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
   modal.show();
     }
+
+      // Fluxo de recuperação de senha
+document.getElementById('btnEsqueceuSenha')?.addEventListener('click', async function () {
+  const email = prompt('Digite o seu email para redefinir a senha:');
+  if (!email) return;
+
+  const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + '/reset.html' // página de reset
+  });
+
+  if (error) {
+    alert('Erro ao enviar email de redefinição: ' + error.message);
+    return;
+  }
+
+  alert('Se este email estiver cadastrado, você receberá instruções para redefinir sua senha.');
+});
     </script>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -1482,6 +1503,7 @@ document.getElementById('formMissionario').addEventListener('submit', async func
 </div>
 </body>
 </html>
+
 
 
 
