@@ -450,9 +450,27 @@
             <input type="number" class="form-control mb-2" id="qtdTag" min="0">
           `;
         } else if (tipo === 'xerox') {
-          detalhes.innerHTML = `
-            <label>Data:</label>
-            <input type="date" class="form-control mb-2" id="dataXerox" value="${hoje}">
+  const qtd = document.getElementById('qtdXerox').value;
+  const data = document.getElementById('dataXerox').value;
+  const cor  = document.getElementById('corXerox').value;
+
+  if (!qtd)  return alert('Informe a quantidade de cópias.');
+  if (!data) return alert('Informe a data.');
+  if (!cor)  return alert('Selecione o tipo de cópia.');
+
+  registro.qtd = parseInt(qtd);
+  registro.data = data;
+  registro.cor  = cor;
+}">
+    <label>Tipo de cópia:</label>
+    <select class="form-select mb-2" id="corXerox" required>
+      <option value="pb">Preto e branco</option>
+      <option value="colorida">Colorida</option>
+    </select>
+    <label>Quantidade de cópias:</label>
+    <input type="number" class="form-control mb-2" id="qtdXerox" min="1">
+  `;
+}">
             <label>Quantidade de cópias:</label>
             <input type="number" class="form-control mb-2" id="qtdXerox" min="1">
           `;
@@ -564,16 +582,27 @@
           }
 
         } else if (tipo === 'xerox') {
-          const qtd = document.getElementById('qtdXerox').value;
-          const data = document.getElementById('dataXerox').value;
+  const qtd = document.getElementById('qtdXerox').value;
+  const data = document.getElementById('dataXerox').value;
+  const cor  = document.getElementById('corXerox').value;
 
-          if (!qtd) return alert('Informe a quantidade de cópias.');
-          if (!data) return alert('Informe a data.');
+  if (!qtd)  return alert('Informe a quantidade de cópias.');
+  if (!data) return alert('Informe a data.');
+  if (!cor)  return alert('Selecione o tipo de cópia.');
 
-          registro.qtd = parseInt(qtd);
-          registro.data = data;
-
-        } else if (tipo === 'refeicoes') {
+  registro.qtd = parseInt(qtd);
+  registro.data = data;
+  registro.cor  = cor;
+}">
+    <label>Tipo de cópia:</label>
+    <select class="form-select mb-2" id="corXerox" required>
+      <option value="pb">Preto e branco</option>
+      <option value="colorida">Colorida</option>
+    </select>
+    <label>Quantidade de cópias:</label>
+    <input type="number" class="form-control mb-2" id="qtdXerox" min="1">
+  `;
+} else if (tipo === 'refeicoes') {
           const dias = [];
           let erro = false;
 
@@ -645,8 +674,11 @@
             return res.join(' · ') || '-';
           }
           case 'xerox': {
-            if (reg.qtd) return `Cópias: ${reg.qtd}`;
-            return '-';
+        const qtd = parseInt(reg.qtd) || 0;
+        if (reg.cor === 'colorida') resumo[nome].xeroxColorida += qtd;
+        else resumo[nome].xeroxPB += qtd;
+        break;
+      }
           }
           case 'refeicoes': {
             if (!Array.isArray(reg.dias) || reg.dias.length === 0) return 'Refeições (detalhes não disponíveis)';
@@ -702,7 +734,9 @@
             return `
               <tr>
                 <td>${dataExib}</td>
-                <td>${reg.tipo || ''}</td>
+                <td>${(reg.tipo === 'xerox' && reg.cor)
+  ? `Xerox (${reg.cor === 'colorida' ? 'Colorida' : 'P&B'})`
+  : (reg.tipo || '')}</td>
                 <td>${detalhes}</td>
                 <td>
                   <button class="btn btn-sm btn-warning me-1" onclick="editarRegistro('${String(reg.id)}')">Editar</button>
@@ -990,7 +1024,8 @@ async function gerarRelatorio() {
         carroDepartamento: {},
         carroTag: 0,
         carroTagPorDepartamento: {},
-        xerox: 0,
+        xeroxPB: 0,
+      xeroxColorida: 0,
         refeicoes: 0,
         hospedagemDias: 0
       };
@@ -1014,8 +1049,20 @@ async function gerarRelatorio() {
         }
         break;
       case 'xerox':
-        resumo[nome].xerox += parseInt(reg.qtd) || 0;
-        break;
+  html += `
+    <label>Data:</label>
+    <input type="date" class="form-control mb-2" id="edit-data" value="${registro.data || ''}" required>
+
+    <label>Tipo de cópia:</label>
+    <select class="form-select mb-2" id="edit-corXerox">
+      <option value="pb" ${registro.cor !== 'colorida' ? 'selected' : ''}>Preto e branco</option>
+      <option value="colorida" ${registro.cor === 'colorida' ? 'selected' : ''}>Colorida</option>
+    </select>
+
+    <label>Quantidade de cópias:</label>
+    <input type="number" class="form-control mb-2" id="edit-qtdXerox" value="${registro.qtd || 0}" min="1">
+  `;
+  break;
       case 'refeicoes':
         (reg.dias || []).forEach(dia => {
           const data = new Date(dia.data);
@@ -1041,9 +1088,13 @@ async function gerarRelatorio() {
     for (let depto in r.carroDepartamento) {
       texto += `    • ${depto}: ${r.carroDepartamento[depto]} km rodados\n`;
     }
+    texto += `- Xerox (P&B): ${r.xeroxPB} cópia(s)\n`;
+    texto += `- Xerox (Colorida): ${r.xeroxColorida} cópia(s)\n`;
     texto += `- Uso da TAG (total): ${r.carroTag} uso(s)\n`;
     if (Object.keys(r.carroTagPorDepartamento).length > 0) {
-      texto += `- Uso da TAG por departamento:\n`;
+      texto += `- Xerox (P&B): ${r.xeroxPB} cópia(s)\n`;
+    texto += `- Xerox (Colorida): ${r.xeroxColorida} cópia(s)\n`;
+    texto += `- Uso da TAG por departamento:\n`;
       for (let depto in r.carroTagPorDepartamento) {
         texto += `    • ${depto}: ${r.carroTagPorDepartamento[depto]} uso(s)\n`;
       }
@@ -1503,15 +1554,3 @@ document.getElementById('btnEsqueceuSenha')?.addEventListener('click', async fun
 </div>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
