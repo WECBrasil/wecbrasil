@@ -1493,7 +1493,7 @@ document.getElementById('btnEsqueceuSenha')?.addEventListener('click', async fun
   if (!email) return;
 
   const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: window.location.origin + '/reset.html' // página de reset
+    redirectTo: "https://wecbrasil.github.io/wecbrasil/reset.html"
   });
 
   if (error) {
