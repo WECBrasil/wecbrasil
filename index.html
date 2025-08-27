@@ -27,6 +27,9 @@
       <input type="text" class="form-control mb-2" id="loginUsuario" placeholder="Email" required>
       <div class="input-group mb-2">
         <input type="password" class="form-control" id="loginSenha" placeholder="Senha" required>
+        <button class="btn btn-outline-secondary" type="button" id="toggleSenha">
+          👁️
+        </button>
       </div>
       <button type="submit" class="btn btn-primary">Entrar</button>
     </form>
@@ -224,6 +227,13 @@
       let listaCache = [];
       let registroEditando = null;
 
+      document.getElementById("toggleSenha").addEventListener("click", function () {
+  const senhaInput = document.getElementById("loginSenha");
+  const tipo = senhaInput.getAttribute("type") === "password" ? "text" : "password";
+  senhaInput.setAttribute("type", tipo);
+  this.textContent = tipo === "password" ? "👁️" : "🙈";
+});
+      
       function formatDateISOtoBR(iso) {
         if (!iso) return '';
         const [ano, mes, dia] = iso.split('-');
