@@ -124,10 +124,31 @@
         <small class="text-muted">Meus registros recentes</small>
       </div>
       <div class="card-body">
+        
+        <div id="filtroRegistros" class="mb-3 d-flex flex-wrap gap-2">
+          <div>
+            <label for="filtroDataInicio" class="form-label">De:</label>
+            <input type="date" id="filtroDataInicio" class="form-control">
+          </div>
+          <div>
+            <label for="filtroDataFim" class="form-label">Até:</label>
+            <input type="date" id="filtroDataFim" class="form-control">
+          </div>
+          <!-- Este campo só aparece para admin -->
+          <div id="filtroUsuarioContainer" class="hidden">
+            <label for="filtroUsuario" class="form-label">Usuário:</label>
+            <input type="text" id="filtroUsuario" class="form-control" placeholder="Nome do Usuário">
+          </div>
+          <div class="d-flex align-items-end">
+            <button class="btn btn-primary ms-2" onclick="aplicarFiltro()">Filtrar</button>
+          </div>
+        </div>
+
         <table class="table table-sm table-bordered" id="tabelaRegistros">
           <thead>
             <tr>
               <th style="width:120px">Data</th>
+              <th>Usuário</th>
               <th>Tipo</th>
               <th>Detalhes</th>
               <th style="width:140px">Ações</th>
@@ -296,6 +317,7 @@
         if (usuarioLogado.tipo === 'admin') {
         document.getElementById('cadastroCard')?.classList.remove('hidden');
          document.getElementById('gerenciarUsuariosCard')?.classList.remove('hidden');
+          document.getElementById('filtroUsuarioContainer')?.classList.remove('hidden');
         }
         if (usuarioLogado.liberado_relatorio_geral || usuarioLogado.tipo === 'admin') {
         document.getElementById('relatorioCard')?.classList.remove('hidden');
@@ -459,6 +481,10 @@
             <input type="number" class="form-control mb-2" id="kmInicial" min="0">
             <label>KM Final:</label>
             <input type="number" class="form-control mb-2" id="kmFinal" min="0">
+            <label>Horário de saída:</label>
+            <input type="time" class="form-control mb-2" id="horaSaida">
+            <label>Horário de chegada:</label>
+            <input type="time" class="form-control mb-2" id="horaChegada">
             <label>Uso:</label>
             <select class="form-select mb-2" id="usoCarro" onchange="mostrarCampoDepartamento()">
               <option value="pessoal">Pessoal</option>
@@ -569,6 +595,8 @@
           const qtdTag = document.getElementById('qtdTag').value;
           const uso = document.getElementById('usoCarro').value;
           const data = document.getElementById('dataCarro').value;
+          const horaSaida = document.getElementById('horaSaida').value;
+          const horaChegada = document.getElementById('horaChegada').value;
 
           if (!kmInicial || !kmFinal || isNaN(kmInicial) || isNaN(kmFinal)) {
             return alert('Informe os km inicial e final.');
@@ -577,6 +605,8 @@
 
           registro.kminicial = parseInt(kmInicial);
           registro.kmfinal = parseInt(kmFinal);
+          registro.horasaida = horaSaida;
+          registro.horachegada = horaChegada;
           registro.qtdtag = parseInt(qtdTag) || 0;
           registro.uso = uso;
           registro.data = data;
@@ -666,6 +696,8 @@
             if (reg.uso) res.push(`Uso: ${reg.uso}`);
             if (reg.departamento) res.push(`Dept: ${reg.departamento}`);
             if (reg.motorista) res.push(`Motorista: ${reg.motorista}`);
+            if (reg.horasaida) res.push(`Saída: ${reg.horasaida}`);
+            if (reg.horachegada) res.push(`Chegada: ${reg.horachegada}`);
             if (reg.qtdtag) res.push(`TAGs: ${reg.qtdtag}`);
             return res.join(' · ') || '-';
           }
@@ -724,6 +756,7 @@
           }
 
           const rows = listaCache.map(reg => {
+            const usuarioNome = reg.nome || reg.user_id || '';
             const dataExib = reg.data
               ? new Date(String(reg.data) + 'T00:00:00').toLocaleDateString('pt-BR', { timeZone: 'UTC' })
               : 'Sem data';
@@ -731,6 +764,7 @@
             return `
               <tr>
                 <td>${dataExib}</td>
+                <td>${usuarioNome}</td>
                 <td>${reg.tipo || ''}</td>
                 <td>${detalhes}</td>
                 <td>
@@ -807,6 +841,10 @@
         <input type="number" class="form-control mb-2" id="edit-kmInicial" value="${registro.kminicial || 0}" min="0">
         <label>KM Final:</label>
         <input type="number" class="form-control mb-2" id="edit-kmFinal" value="${registro.kmfinal || 0}" min="0">
+        <label>Horário de saída:</label>
+        <input type="time" class="form-control mb-2" id="edit-horaSaida" value="${registro.horasaida || ''}">
+        <label>Horário de chegada:</label>
+        <input type="time" class="form-control mb-2" id="edit-horaChegada" value="${registro.horachegada || ''}">
         <label>Uso:</label>
         <select class="form-select mb-2" id="edit-usoCarro">
           <option value="pessoal" ${registro.uso === 'pessoal' ? 'selected' : ''}>Pessoal</option>
@@ -926,6 +964,8 @@ function adicionarDiaRefeicaoEdicao() {
         data: document.getElementById('edit-data').value,
         kminicial: Number(document.getElementById('edit-kmInicial').value),
         kmfinal: Number(document.getElementById('edit-kmFinal').value),
+          horasaida: document.getElementById('edit-horaSaida').value,
+          horachegada: document.getElementById('edit-horaChegada').value,
         uso: document.getElementById('edit-usoCarro').value,
         qtdtag: Number(document.getElementById('edit-qtdTag').value)
       };
@@ -984,7 +1024,61 @@ function adicionarDiaRefeicaoEdicao() {
   carregarListaRegistros();
 };
 
-      supabase.auth.onAuthStateChange((event, session) => {
+async function aplicarFiltro() {
+  const dataInicio = document.getElementById('filtroDataInicio').value;
+  const dataFim = document.getElementById('filtroDataFim').value;
+  const usuarioFiltro = document.getElementById('filtroUsuario')?.value?.trim();
+  const usuarioLogado = JSON.parse(localStorage.getItem('usuarioLogado'));
+
+  let query = supabase
+    .from('registros')
+    .select('*')
+    .order('data', { ascending: false });
+
+  if (dataInicio) query = query.gte('data', dataInicio);
+  if (dataFim) query = query.lte('data', dataFim);
+
+  if (usuarioLogado.tipo === 'comum') {
+    query = query.eq('user_id', usuarioLogado.id);
+  } else if (usuarioLogado.tipo === 'admin' && usuarioFiltro) {
+    query = query.ilike('nome', `%${usuarioFiltro}%`);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    alert('Erro ao aplicar filtro: ' + error.message);
+    return;
+  }
+
+  listaCache = data || [];
+  const tbody = document.getElementById('listaRegistros');
+  if (!listaCache.length) {
+    tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted">Nenhum registro encontrado.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = listaCache.map(reg => {
+      const usuarioNome = reg.usuarios?.nome || reg.nome || '';
+      const dataExib = reg.data
+      ? new Date(String(reg.data) + 'T00:00:00').toLocaleDateString('pt-BR', { timeZone: 'UTC' })
+      : 'Sem data';
+    const detalhes = gerarDescricaoDetalhada(reg).replace(/</g, '&lt;');
+    return `
+      <tr>
+        <td>${dataExib}</td>
+        <td>${usuarioNome}</td>
+        <td>${reg.tipo || ''}</td>
+        <td>${detalhes}</td>
+        <td>
+          <button class="btn btn-sm btn-warning me-1" onclick="editarRegistro('${String(reg.id)}')">Editar</button>
+          <button class="btn btn-sm btn-danger" onclick="excluirRegistroSupabase('${String(reg.id)}')">Excluir</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+supabase.auth.onAuthStateChange((event, session) => {
         if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
           verificarLogin();
           carregarListaRegistros();
@@ -1001,21 +1095,25 @@ async function gerarRelatorio() {
   const dataFinalISO = dataFinal.includes('/') ? dataBRParaISO(dataFinal) : dataFinal;
   const inicio = dataInicialISO ? new Date(dataInicialISO) : null;
   const fim = dataFinalISO ? new Date(dataFinalISO) : null;
+
+  // Busca todos os registros, sem filtrar por reg.data
   const { data: registros, error } = await supabase
-   .from('registros')
-   .select('*')
-   .gte('data', dataInicialISO || '1900-01-01')
-   .lte('data', dataFinalISO || '2999-12-31');
+    .from('registros')
+    .select('*');
+
   if (error) {
     console.error('Erro ao buscar registros:', error);
     document.getElementById('relatorio').textContent = 'Erro ao gerar relatório.';
     return;
   }
+
   if (!registros || registros.length === 0) {
     document.getElementById('relatorio').textContent = 'Nenhum registro encontrado no período selecionado.';
     return;
   }
+
   const resumo = {};
+
   registros.forEach(reg => {
     const nome = reg.nome || reg.user_id;
     if (!resumo[nome]) {
@@ -1031,15 +1129,23 @@ async function gerarRelatorio() {
         hospedagemDias: 0
       };
     }
+
     switch (reg.tipo) {
-      case 'lavanderia':
+      case 'lavanderia': {
+        const data = new Date(reg.data);
+        if ((inicio && data < inicio) || (fim && data > fim)) return;
         resumo[nome].lavanderia += parseInt(reg.qtdlavagens) || 0;
         break;
-      case 'carro':
+      }
+      case 'carro': {
+        const data = new Date(reg.data);
+        if ((inicio && data < inicio) || (fim && data > fim)) return;
+
         const qtdTag = parseInt(reg.qtdtag) || 0;
         const kmInicial = parseInt(reg.kminicial) || 0;
         const kmFinal = parseInt(reg.kmfinal) || 0;
         const km = kmFinal - kmInicial;
+
         if (reg.uso === 'departamento') {
           const depto = reg.departamento || 'Não especificado';
           resumo[nome].carroDepartamento[depto] = (resumo[nome].carroDepartamento[depto] || 0) + km;
@@ -1049,29 +1155,41 @@ async function gerarRelatorio() {
           resumo[nome].carroTag += qtdTag;
         }
         break;
-      case 'copias':
+      }
+      case 'copias': {
+        const data = new Date(reg.data);
+        if ((inicio && data < inicio) || (fim && data > fim)) return;
+
         if (reg.tipoimpressao === 'preto') {
           resumo[nome].copiasPreto += parseInt(reg.qtd) || 0;
         } else if (reg.tipoimpressao === 'colorida') {
           resumo[nome].copiasColorida += parseInt(reg.qtd) || 0;
         }
         break;
-      case 'refeicoes':
+      }
+      case 'refeicoes': {
+        // Aqui usamos SOMENTE os dias agendados
         (reg.dias || []).forEach(dia => {
-          const data = new Date(dia.data);
-          if ((inicio && data < inicio) || (fim && data > fim)) return;
+          const dataISO = dia.data; // já está em formato YYYY-MM-DD
+          if ((dataInicialISO && dataISO < dataInicialISO) || 
+              (dataFinalISO && dataISO > dataFinalISO)) return;
           resumo[nome].refeicoes += parseInt(dia.qtd) || 0;
         });
         break;
-      case 'hospedagem':
+      }
+      case 'hospedagem': {
         const entrada = new Date(reg.entrada);
         const saida = new Date(reg.saida);
         if ((inicio && saida < inicio) || (fim && entrada > fim)) return;
+
         const dias = Math.ceil((saida - entrada) / (1000 * 60 * 60 * 24));
         if (dias > 0) resumo[nome].hospedagemDias += dias;
         break;
+      }
     }
   });
+
+  // Monta o relatório em texto
   let texto = '';
   for (let nome in resumo) {
     const r = resumo[nome];
@@ -1094,8 +1212,10 @@ async function gerarRelatorio() {
     texto += `- Refeições: ${r.refeicoes} refeição(ões)\n`;
     texto += `- Hospedagem: ${r.hospedagemDias} dia(s)\n\n`;
   }
+
   document.getElementById('relatorio').textContent = texto;
 }
+
 function dataBRParaISO(dataBR) {
   const partes = dataBR.split('/');
   if (partes.length !== 3) return null;
