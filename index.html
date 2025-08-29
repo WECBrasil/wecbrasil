@@ -1025,13 +1025,8 @@ function adicionarDiaRefeicaoEdicao() {
 };
 
 async function aplicarFiltro() {
-  let dataInicio = document.getElementById('filtroDataInicio').value;
-  let dataFim = document.getElementById('filtroDataFim').value;
-
-// Se o usuário digitou DD/MM/YYYY, converte para ISO
-if (dataInicio.includes('/')) dataInicio = dataBRParaISO(dataInicio);
-if (dataFim.includes('/')) dataFim = dataBRParaISO(dataFim);
-
+  const dataInicio = document.getElementById('filtroDataInicio').value;
+  const dataFim = document.getElementById('filtroDataFim').value;
   const usuarioFiltro = document.getElementById('filtroUsuario')?.value?.trim();
   const usuarioLogado = JSON.parse(localStorage.getItem('usuarioLogado'));
 
