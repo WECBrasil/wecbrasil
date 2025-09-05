@@ -229,7 +229,9 @@
     </div>
     <button class="btn btn-success mb-2" onclick="gerarRelatorioRefeicoesPeriodo()">Gerar Relatório</button>
     <pre id="relatorioRefeicoesPeriodo" class="bg-light p-2 rounded"></pre>
+    <!-- Removido: <pre id="relatorioRefeicoesNomes" class="bg-light p-2 rounded mt-2"></pre> -->
     <a id="whatsappLinkRefeicoes" class="btn btn-outline-success" href="#" target="_blank" style="display: none;">Compartilhar via WhatsApp</a>
+    <button id="btnModalNomesRefeicoes" class="btn btn-outline-primary ms-2" type="button" style="display: none;">Ver nomes por dia</button>
   </div>
 </div>
 
@@ -734,13 +736,19 @@
           const { data: userData, error: userError } = await supabase.auth.getUser();
           if (userError) throw userError;
           const user = userData?.user || null;
+          const usuarioLogado = JSON.parse(localStorage.getItem('usuarioLogado'));
 
           let query = supabase
             .from('registros')
             .select('*')
             .order('data', { ascending: false });
 
-          if (!verTodos && user) query = query.eq('user_id', user.id);
+          // Sempre filtrar por user_id para usuários comuns, mesmo com verTodos=true
+          if (usuarioLogado?.tipo === 'comum' && user) {
+            query = query.eq('user_id', user.id);
+          } else if (!verTodos && user) {
+            query = query.eq('user_id', user.id);
+          }
           if (limite != null && Number(limite) > 0) query = query.limit(Number(limite));
 
           const { data, error } = await query;
@@ -1363,7 +1371,7 @@ async function gerarRelatorioRefeicoesPeriodo() {
   fim.setHours(23, 59, 59, 999);
   const { data: registros, error } = await supabase
     .from('registros')
-    .select('*')
+    .select('dias, nome, user_id')
     .eq('tipo', 'refeicoes');
   if (error) {
     alert('Erro ao carregar os registros.');
@@ -1374,14 +1382,16 @@ async function gerarRelatorioRefeicoesPeriodo() {
     return;
   }
   const resumo = {};
+  const pessoasPorDia = {};
   registros.forEach(reg => {
     if (Array.isArray(reg.dias)) {
       reg.dias.forEach(dia => {
         const data = new Date(dia.data);
         if (data >= inicio && data <= fim) {
           const diaStr = data.toISOString().split('T')[0];
-          if (!resumo[diaStr]) resumo[diaStr] = 0;
-          resumo[diaStr] += parseInt(dia.qtd || 0);
+          resumo[diaStr] = (resumo[diaStr] || 0) + parseInt(dia.qtd || 0);
+          if (!pessoasPorDia[diaStr]) pessoasPorDia[diaStr] = [];
+          pessoasPorDia[diaStr].push(reg.nome || reg.user_id || 'Sem nome');
         }
       });
     }
@@ -1390,6 +1400,7 @@ async function gerarRelatorioRefeicoesPeriodo() {
     const [ano, mes, dia] = str.split('-');
     return `${dia}/${mes}/${ano}`;
   };
+  // Relatório 1: Quantidade por dia
   let texto = `🗓️ Refeições agendadas por dia (${formatarData(dataInicial)} a ${formatarData(dataFinal)}):\n\n`;
   if (Object.keys(resumo).length === 0) {
     texto += 'Nenhum agendamento encontrado.';
@@ -1401,10 +1412,55 @@ async function gerarRelatorioRefeicoesPeriodo() {
     });
   }
   document.getElementById('relatorioRefeicoesPeriodo').textContent = texto;
+
+  // Relatório 2: Nomes por dia (NÃO exibe mais na tela, só no modal)
+  // let textoNomes = `👤 Pessoas que agendaram por dia:\n\n`;
+  // if (Object.keys(pessoasPorDia).length === 0) {
+  //   textoNomes += 'Nenhum agendamento encontrado.';
+  // } else {
+  //   const diasOrdenados = Object.keys(pessoasPorDia).sort();
+  //   diasOrdenados.forEach(dia => {
+  //     const nomes = pessoasPorDia[dia].filter(Boolean).join(', ');
+  //     textoNomes += `• ${formatarData(dia)}: ${nomes || 'Sem nomes'}\n`;
+  //   });
+  // }
+  // Removido: não exibe mais o <pre id="relatorioRefeicoesNomes"> na tela
+
+  // WhatsApp: só compartilha o resumo por dia
   const link = `https://wa.me/?text=${encodeURIComponent(texto)}`;
   const whatsappBtn = document.getElementById('whatsappLinkRefeicoes');
   whatsappBtn.href = link;
   whatsappBtn.style.display = 'inline-block';
+
+  // ...dentro de gerarRelatorioRefeicoesPeriodo...
+  // Salve o relatório de nomes em uma variável global para uso no modal
+  window._relatorioNomesRefeicoes = pessoasPorDia;
+
+  // Mostre o botão para abrir o modal
+  const btnModalNomes = document.getElementById('btnModalNomesRefeicoes');
+  btnModalNomes.style.display = 'inline-block';
+
+  // Evento para abrir o modal e preencher a tabela
+  btnModalNomes.onclick = function() {
+    const pessoasPorDia = window._relatorioNomesRefeicoes || {};
+    const diasOrdenados = Object.keys(pessoasPorDia).sort();
+    let html = '';
+    if (!diasOrdenados.length) {
+      html = '<div class="text-muted text-center">Nenhum agendamento encontrado.</div>';
+    } else {
+      html = `<table class="table table-bordered table-sm">
+        <thead><tr><th>Data</th><th>Nomes</th></tr></thead><tbody>`;
+      diasOrdenados.forEach(dia => {
+        const nomes = pessoasPorDia[dia].filter(Boolean).join(', ');
+        const [ano, mes, diaNum] = dia.split('-');
+        html += `<tr><td>${diaNum}/${mes}/${ano}</td><td>${nomes || 'Sem nomes'}</td></tr>`;
+      });
+      html += '</tbody></table>';
+    }
+    document.getElementById('modalNomesRefeicoesBody').innerHTML = html;
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('modalNomesRefeicoes'));
+    modal.show();
+  };
 }
 async function carregarListaUsuarios() {
   const lista = document.getElementById('listaUsuarios');
@@ -1658,6 +1714,20 @@ document.getElementById('btnEsqueceuSenha')?.addEventListener('click', async fun
       </div>
       <div class="modal-body">
         <ul id="listaUsuariosModal" class="list-group"></ul>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Modal para nomes das pessoas por dia -->
+<div class="modal fade" id="modalNomesRefeicoes" tabindex="-1" aria-labelledby="modalNomesRefeicoesLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalNomesRefeicoesLabel">Pessoas que agendaram por dia</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body" id="modalNomesRefeicoesBody">
+        <!-- Conteúdo preenchido via JS -->
       </div>
     </div>
   </div>
