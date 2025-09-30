@@ -20,7 +20,7 @@
       <h1 class="fs-4">Registro de Serviços</h1>
     </header>
 
-    <!-- Trecho do Login (alterado) -->
+    <!-- Trecho do Login -->
 <div class="card mb-4" id="loginCard">
   <div class="card-header">Login</div>
   <div class="card-body">
@@ -38,7 +38,6 @@
       <span>Não tem conta?</span>
       <button class="btn btn-link p-0" id="btnMostrarCadastro">Cadastre-se</button>
     </div>
-    <!-- Novo botão Esqueceu a senha -->
     <div class="mt-2">
       <button class="btn btn-link p-0" id="btnEsqueceuSenha">Esqueceu a senha?</button>
     </div>
@@ -229,7 +228,6 @@
     </div>
     <button class="btn btn-success mb-2" onclick="gerarRelatorioRefeicoesPeriodo()">Gerar Relatório</button>
     <pre id="relatorioRefeicoesPeriodo" class="bg-light p-2 rounded"></pre>
-    <!-- Removido: <pre id="relatorioRefeicoesNomes" class="bg-light p-2 rounded mt-2"></pre> -->
     <a id="whatsappLinkRefeicoes" class="btn btn-outline-success" href="#" target="_blank" style="display: none;">Compartilhar via WhatsApp</a>
     <button id="btnModalNomesRefeicoes" class="btn btn-outline-primary ms-2" type="button" style="display: none;">Ver nomes por dia</button>
   </div>
@@ -743,7 +741,6 @@
             .select('*')
             .order('data', { ascending: false });
 
-          // Sempre filtrar por user_id para usuários comuns, mesmo com verTodos=true
           if (usuarioLogado?.tipo === 'comum' && user) {
             query = query.eq('user_id', user.id);
           } else if (!verTodos && user) {
@@ -823,7 +820,6 @@
   registroEditando = registro;
   document.getElementById('edit-id').value = registro.id;
 
-  // Monta os campos conforme o tipo
   const container = document.getElementById('camposEdicaoServico');
   const tipo = registro.tipo;
 
@@ -899,7 +895,6 @@
   }
   container.innerHTML = html;
 
-  // Especial para refeições: renderize os dias existentes
   if (tipo === 'refeicoes' && Array.isArray(registro.dias)) {
     const refeicoesContainer = document.getElementById('edit-refeicoesDias');
     registro.dias.forEach(dia => {
@@ -916,7 +911,6 @@
     });
   }
 
-  // Departamento dinâmico: atualize ao mudar o uso
   if (tipo === 'carro') {
     document.getElementById('edit-usoCarro').addEventListener('change', function() {
       const campo = document.getElementById('edit-campoDepartamento');
@@ -931,13 +925,11 @@
     });
   }
 
-  // Mostra o modal
   const modalEl = document.getElementById('modalEditarRegistro');
   const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
   modal.show();
 }
 
-// Adicionar novo dia de refeições no modo edição
 function adicionarDiaRefeicaoEdicao() {
   const diasContainer = document.getElementById('edit-refeicoesDias');
   const novoDia = document.createElement('div');
@@ -954,7 +946,7 @@ function adicionarDiaRefeicaoEdicao() {
 
       async function salvarEdicao() {
   const id = document.getElementById('edit-id').value;
-  const tipo = registroEditando.tipo; // O tipo não muda!
+  const tipo = registroEditando.tipo;
   let payload = {};
   let valid = true;
 
@@ -1016,7 +1008,6 @@ function adicionarDiaRefeicaoEdicao() {
     return;
   }
 
-  // Atualize via Supabase
   const { error } = await supabase
     .from('registros')
     .update(payload)
@@ -1104,7 +1095,6 @@ async function gerarRelatorio() {
   const inicio = dataInicialISO ? new Date(dataInicialISO) : null;
   const fim = dataFinalISO ? new Date(dataFinalISO) : null;
 
-  // Busca todos os registros, sem filtrar por reg.data
   const { data: registros, error } = await supabase
     .from('registros')
     .select('*');
@@ -1178,7 +1168,6 @@ async function gerarRelatorio() {
         break;
       }
       case 'refeicoes': {
-        // Aqui usamos SOMENTE os dias agendados
         (reg.dias || []).forEach(dia => {
           const dataISO = dia.data; // já está em formato YYYY-MM-DD
           if ((dataInicialISO && dataISO < dataInicialISO) || 
@@ -1304,8 +1293,6 @@ function baixarRelatorioPDF() {
     doc.setFontSize(11);
     doc.text(`Período: ${dataBR(dataInicial)} a ${dataBR(dataFinal)}`, largura / 2, 36, { align: 'center' });
   }
-
-// ...substitua o bloco de geração dos blocos PDF na função baixarRelatorioPDF...
 
 const blocos = texto.split(/Usuário:/).filter(Boolean);
 
