@@ -7,7 +7,9 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
   <style>
-    .hidden { display: none; }
+    .hidden {
+      display: none;
+    }
   </style>
 </head>
 <body class="p-4">
@@ -163,6 +165,9 @@
           <button id="btnVerTodos" class="btn btn-outline-primary btn-sm hidden" type="button">
             Ver todos
           </button>
+          <button id="btnRecolher" class="btn btn-outline-secondary btn-sm hidden" type="button">
+            Recolher
+          </button>
         </div>
       </div>
     </div>
@@ -226,6 +231,7 @@
         <input type="date" class="form-control" id="dataRefFim">
       </div>
     </div>
+    <div id="periodoInfo" class="text-muted small mb-2"></div>
     <button class="btn btn-success mb-2" onclick="gerarRelatorioRefeicoesPeriodo()">Gerar Relatório</button>
     <pre id="relatorioRefeicoesPeriodo" class="bg-light p-2 rounded"></pre>
     <a id="whatsappLinkRefeicoes" class="btn btn-outline-success" href="#" target="_blank" style="display: none;">Compartilhar via WhatsApp</a>
@@ -729,69 +735,127 @@
         }
       }
 
-      async function carregarListaRegistros(limite = 5, verTodos = false) {
-        try {
-          const { data: userData, error: userError } = await supabase.auth.getUser();
-          if (userError) throw userError;
-          const user = userData?.user || null;
-          const usuarioLogado = JSON.parse(localStorage.getItem('usuarioLogado'));
+            async function carregarListaRegistros(limite = 5, verTodos = false) {
+              try {
+                const { data: userData, error: userError } = await supabase.auth.getUser();
+                if (userError) throw userError;
+                const user = userData?.user || null;
+                const usuarioLogado = JSON.parse(localStorage.getItem('usuarioLogado'));
+            
+                // Primeiro, vamos verificar se o usuário tem algum registro
+                let queryTotal = supabase
+                  .from('registros')
+                  .select('*', { count: 'exact' });
+            
+                if (usuarioLogado?.tipo === 'comum' && user) {
+                  queryTotal = queryTotal.eq('user_id', user.id);
+                }
+            
+                const { count: totalRegistros } = await queryTotal;
+            
+                // Se não houver nenhum registro, mostre a mensagem apropriada
+                if (totalRegistros === 0) {
+                  const tbody = document.getElementById('listaRegistros');
+                  tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted">Nenhum registro encontrado.</td></tr>`;
+                  document.getElementById('btnVerTodos')?.classList.toggle('hidden', true);
+                  document.getElementById('btnRecolher')?.classList.toggle('hidden', true);
+                  document.getElementById('periodoInfo')?.classList.toggle('hidden', true);
+                  return;
+                }
+            
+                // Consulta para o mês atual
+                let query = supabase
+                  .from('registros')
+                  .select('*')
+                  .order('data', { ascending: false });
+                
+                const hoje = new Date();
+                const primeiroDiaMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0];
+                const ultimoDiaMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).toISOString().split('T')[0];
+                query = query
+                  .gte('data', primeiroDiaMes)
+                  .lte('data', ultimoDiaMes);
+            
+                if (usuarioLogado?.tipo === 'comum' && user) {
+                  query = query.eq('user_id', user.id);
+                } else if (!verTodos && user) {
+                  query = query.eq('user_id', user.id);
+                }
+                
+                if (!verTodos && limite != null && Number(limite) > 0) {
+                  query = query.limit(Number(limite));
+                }
+            
+                const { data, error } = await query;
+                if (error) throw error;
+            
+                listaCache = data || [];
+                const tbody = document.getElementById('listaRegistros');
+            
+                // Se não houver registros no mês atual
+                if (!listaCache.length) {
+                  tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted">Nenhum registro encontrado para o mês atual.</td></tr>`;
+                  document.getElementById('btnVerTodos')?.classList.toggle('hidden', true);
+                  document.getElementById('btnRecolher')?.classList.toggle('hidden', true);
+                  document.getElementById('periodoInfo')?.classList.toggle('hidden', true);
+                  return;
+                }
+            
+                const rows = listaCache.map(reg => {
+                  const usuarioNome = reg.nome || reg.user_id || '';
+                  const dataExib = reg.data
+                    ? new Date(String(reg.data) + 'T00:00:00').toLocaleDateString('pt-BR', { timeZone: 'UTC' })
+                    : 'Sem data';
+                  const detalhes = gerarDescricaoDetalhada(reg).replace(/</g, '&lt;');
+                  return `
+                    <tr>
+                      <td>${dataExib}</td>
+                      <td>${usuarioNome}</td>
+                      <td>${reg.tipo || ''}</td>
+                      <td>${detalhes}</td>
+                      <td>
+                        <button class="btn btn-sm btn-warning me-1" onclick="editarRegistro('${String(reg.id)}')">Editar</button>
+                        <button class="btn btn-sm btn-danger" onclick="excluirRegistroSupabase('${String(reg.id)}')">Excluir</button>
+                      </td>
+                    </tr>
+                  `;
+                }).join('');
+            
+                tbody.innerHTML = rows;
+            
+                // Mostrar/ocultar botões apropriados
+                const btnVerTodos = document.getElementById('btnVerTodos');
+                const btnRecolher = document.getElementById('btnRecolher');
+                btnVerTodos?.classList.toggle('hidden', verTodos);
+                btnRecolher?.classList.toggle('hidden', !verTodos);
+            
+                // Atualizar informação do período
+                const periodoInfo = document.getElementById('periodoInfo');
+                if (periodoInfo) {
+                  const mes = hoje.toLocaleString('pt-BR', { month: 'long' });
+                  if (verTodos) {
+                    periodoInfo.textContent = `Mostrando todos os registros de ${mes}`;
+                  } else {
+                    periodoInfo.textContent = `Mostrando últimos ${limite} registros de ${mes}`;
+                  }
+                  periodoInfo.classList.remove('hidden');
+                }
+            
+              } catch (err) {
+                console.error('Erro ao carregar registros:', err);
+                document.getElementById('listaRegistros').innerHTML =
+                  `<tr><td colspan="5" class="text-center text-danger">Erro ao carregar registros: ${err.message || err}</td></tr>`;
+              }
+            }
 
-          let query = supabase
-            .from('registros')
-            .select('*')
-            .order('data', { ascending: false });
-
-          if (usuarioLogado?.tipo === 'comum' && user) {
-            query = query.eq('user_id', user.id);
-          } else if (!verTodos && user) {
-            query = query.eq('user_id', user.id);
-          }
-          if (limite != null && Number(limite) > 0) query = query.limit(Number(limite));
-
-          const { data, error } = await query;
-          if (error) throw error;
-
-          listaCache = data || [];
-
-          const tbody = document.getElementById('listaRegistros');
-          if (!listaCache.length) {
-            tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted">Nenhum registro encontrado.</td></tr>`;
-            document.getElementById('btnVerTodos')?.classList.toggle('hidden', !(limite != null && Number(limite) > 0));
-            return;
-          }
-
-          const rows = listaCache.map(reg => {
-            const usuarioNome = reg.nome || reg.user_id || '';
-            const dataExib = reg.data
-              ? new Date(String(reg.data) + 'T00:00:00').toLocaleDateString('pt-BR', { timeZone: 'UTC' })
-              : 'Sem data';
-            const detalhes = gerarDescricaoDetalhada(reg).replace(/</g, '&lt;');
-            return `
-              <tr>
-                <td>${dataExib}</td>
-                <td>${usuarioNome}</td>
-                <td>${reg.tipo || ''}</td>
-                <td>${detalhes}</td>
-                <td>
-                  <button class="btn btn-sm btn-warning me-1" onclick="editarRegistro('${String(reg.id)}')">Editar</button>
-                  <button class="btn btn-sm btn-danger" onclick="excluirRegistroSupabase('${String(reg.id)}')">Excluir</button>
-                </td>
-              </tr>
-            `;
-          }).join('');
-
-          tbody.innerHTML = rows;
-
-          document.getElementById('btnVerTodos')?.classList.toggle('hidden', !(limite != null && Number(limite) > 0));
-        } catch (err) {
-          console.error('Erro ao carregar registros:', err);
-          document.getElementById('listaRegistros').innerHTML =
-            `<tr><td colspan="4" class="text-center text-danger">Erro ao carregar registros: ${err.message || err}</td></tr>`;
-        }
-      }
-
+      // Event listener para o botão "Ver todos"
       document.getElementById('btnVerTodos').addEventListener('click', () => {
         carregarListaRegistros(null, true);
+      });
+      
+      // Event listener para o botão "Recolher"
+      document.getElementById('btnRecolher').addEventListener('click', () => {
+        carregarListaRegistros(5, false);
       });
 
       async function excluirRegistroSupabase(id) {
