@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="vendor/bootstrap.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container-fluid p-4">
+    
+    <!-- SEÇÃO 1: UPLOAD -->
+    <div id="uploadSection" class="card mb-4">
+      <div class="card-header bg-primary text-white">
+        <h4 class="mb-0">Processamento de Extratos de Remessa</h4>
+      </div>
+      <div class="card-body">
+        <p class="lead">Envie a planilha bruta (exportada do Omie).</p>
+        
+        <div id="alertBox"></div>
+
+        <form id="uploadForm">
+          <div class="mb-3">
+            <label class="form-label"><strong>Arquivo</strong></label>
+            <input class="form-control" type="file" id="fileInput" accept=".xlsx,.xls,.csv" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Upload da logo para o cabeçalho (opcional)</label>
+            <input class="form-control" type="file" id="logoInput" accept=".png,.jpg,.jpeg,.gif">
+            <div class="form-text">Utilize apenas se houve alguma alteração na logo da WEC.</div>
+          </div>
+          <button class="btn btn-primary btn-lg" type="submit">📤 Enviar</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Botão para retornar ao menu "Meus aplicativos" (visível somente se veio do admin.html) -->
+      <a id="btnVoltarMeusAplicativos" href="../admin.html" class="btn btn-outline-primary mb-3 hidden" style="margin-left:8px;">
+        ← Meus aplicativos
+      </a>
+
+    <!-- SEÇÃO 2: PREVIEW -->
+    <div id="previewSection" class="hidden">
+      <div class="card mb-4">
+        <div class="card-header bg-info text-white">
+          <h4 class="mb-0">Preview: <span id="previewFileName"></span></h4>
+        </div>
+        <div class="card-body">
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <p><strong>Coluna de valor detectada:</strong> <span id="valColDetected" class="badge bg-success"></span></p>
+            </div>
+            <div class="col-md-6">
+              <p><strong>Valores negativos detectados:</strong> <span id="negCountDisplay" class="badge bg-danger">0</span></p>
+            </div>
+          </div>
+
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <button class="btn btn-warning" type="button" data-bs-toggle="modal" data-bs-target="#negModal" id="negModalBtn">
+                📋 Gerenciar valores negativos
+              </button>
+            </div>
+            <div class="col-md-6 text-end">
+              <span class="badge bg-danger">Linhas destacadas em vermelho = valores negativos</span>
+            </div>
+          </div>
+
+          <h5 class="mt-4 mb-3">Visualização completa da planilha</h5>
+          <div class="table-container">
+            <table class="table table-sm table-striped table-bordered">
+              <thead class="table-light sticky-top">
+                <tr id="previewHeader"></tr>
+              </thead>
+              <tbody id="previewBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- SEÇÃO 3: EXPORTAÇÃO -->
+      <div class="card mb-4">
+        <div class="card-header bg-success text-white">
+          <h5 class="mb-0">Configuração de Exportação</h5>
+        </div>
+        <div class="card-body">
+          <form id="exportForm">
+            <input type="hidden" id="remove_idxs">
+            
+            <div class="mb-3">
+              <label class="form-label"><strong>Nome da coluna de referência</strong></label>
+              <input class="form-control" id="deptColInput" value="Departamento" required>
+              <small class="form-text text-muted">Deve ser exatamente como aparece no cabeçalho</small>
+            </div>
+            
+            <button class="btn btn-success btn-lg" type="button" id="exportBtn">
+              🚀 Executar Exportação (gerar ZIP com PDFs)
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <button class="btn btn-secondary btn-lg" id="backBtn">← Voltar</button>
+    </div>
+  </div>
+  
+  <!-- Modal com lista de negativos (estrutura completa do Bootstrap) -->
+  <div class="modal fade" id="negModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Gerenciar valores negativos (<span id="negCountModal">0</span>)</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <p id="modalEmptyMsg" class="text-muted">Nenhum valor negativo encontrado.</p>
+
+          <table id="negTable" class="table table-sm table-striped" style="display:none;">
+            <thead>
+              <tr>
+                <th><input id="selectAllCheckbox" type="checkbox" /></th>
+                <th>Idx</th>
+                <th>Data</th>
+                <th>Departamento</th>
+                <th>Valor</th>
+              </tr>
+            </thead>
+            <tbody id="negTableBody"></tbody>
+          </table>
+        </div>
+        <div class="modal-footer">
+          <input type="hidden" id="remove_idxs_modal" value="">
+          <button id="applyNegSelection" type="button" class="btn btn-danger">Remover selecionados</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Vendor scripts (ordem importante) -->
+  <script src="vendor/bootstrap.bundle.min.js"></script>
+  <script src="vendor/jszip.min.js"></script>
+  <script src="vendor/xlsx.full.min.js"></script>
+  <script src="vendor/html2pdf.bundle.min.js"></script>
+
+  <!-- jsPDF + autoTable (necessários para geração direta via dados) -->
+  <script src="vendor/jspdf.umd.min.js"></script>
+  <script src="vendor/jspdf.plugin.autotable.min.js"></script>
+
+  <!-- App -->
+  <script src="app.js"></script>
+  <script>
+    // mostra o botão "Voltar — Meus aplicativos" somente se veio do admin.html
+    (function () {
+      const btn = document.getElementById('btnVoltarMeusAplicativos');
+      if (!btn) return;
+      try {
+        const fromAdmin = sessionStorage.getItem('fromAdmin');
+        if (fromAdmin) {
+          btn.classList.remove('hidden');
+          btn.addEventListener('click', (e) => {
+            // limpa flags e navega (mantém comportamento de voltar ao admin)
+            sessionStorage.removeItem('fromAdmin');
+            localStorage.removeItem('admin_inside_app');
+            // href já aponta para ../admin.html — permite navegação normal
+          });
+        } else {
+          btn.classList.add('hidden');
+        }
+      } catch (err) { /* silencioso */ }
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "name": "extrato-remessa",
+  "version": "1.0.0",
+  "description": "Aplicação para processamento de extratos de remessa.",
+  "main": "app.js",
+  "scripts": {
+    "start": "live-server .",
+    "build": "echo 'Build step not defined'",
+    "test": "echo 'No tests defined'"
+  },
+  "author": "Seu Nome",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {
+    "live-server": "^1.2.1"
+  }
+}
