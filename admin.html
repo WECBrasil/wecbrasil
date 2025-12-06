@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WEC Brasil - Administrador</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: linear-gradient(135deg, #f5f5f5 0%, #e9e9e9 100%);
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    }
+
+    .container-principal {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 40px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid #ddd;
+    }
+
+    .logo-titulo {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .logo-img {
+      width: 50px;
+      height: 50px;
+      border-radius: 8px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+    }
+    .logo-img img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    .titulo-header h1 {
+      font-size: 24px;
+      font-weight: 700;
+      color: #333;
+      margin: 0;
+    }
+
+    .user-menu {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .user-info {
+      text-align: right;
+    }
+
+    .user-name {
+      font-weight: 600;
+      color: #333;
+      font-size: 14px;
+    }
+
+    .user-role {
+      font-size: 12px;
+      color: #666;
+    }
+
+    .btn-logout {
+      padding: 8px 16px;
+      font-size: 12px;
+      background: #dc3545;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    .btn-logout:hover {
+      background: #c82333;
+    }
+
+    .secao-aplicativos {
+      margin-top: 40px;
+    }
+
+    .titulo-secao {
+      font-size: 20px;
+      font-weight: 700;
+      color: #333;
+      margin-bottom: 25px;
+    }
+
+    .subtitulo-secao {
+      color: #666;
+      font-size: 14px;
+      margin-bottom: 30px;
+    }
+
+    .aplicativos-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 320px));
+      gap: 25px;
+      margin-bottom: 40px;
+    }
+
+    .card-aplicativo {
+      background: white;
+      border-radius: 12px;
+      padding:20px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      transition: all 0.3s ease;
+      cursor: pointer;
+      text-decoration: none;
+      color: inherit;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      border-left: 5px solid #007bff;
+    }
+
+    .card-aplicativo:hover {
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+      transform: translateY(-5px);
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .icon-aplicativo {
+      font-size: 48px;
+      color: #007bff;
+      width: 60px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #f0f7ff;
+      border-radius: 8px;
+    }
+
+    .info-aplicativo h3 {
+      font-size: 16px;
+      font-weight: 700;
+      color: #333;
+      margin: 0;
+    }
+
+    .info-aplicativo p {
+      font-size: 13px;
+      color: #666;
+      margin: 5px 0 0 0;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+  <div class="container-principal">
+    <!-- Header -->
+    <div class="header">
+      <div class="logo-titulo">
+        <div class="logo-img">
+          <img src="images/wec-logo.png" alt="WEC Brasil logo">
+        </div>
+         <div class="titulo-header">
+           <h1>WEC Brasil</h1>
+         </div>
+      </div>
+      <div class="user-menu">
+        <div class="user-info">
+          <div class="user-name" id="usuarioNome">Carregando...</div>
+          <div class="user-role" id="usuarioTipo">Administrador</div>
+        </div>
+        <button class="btn-logout" onclick="logout()">Sair</button>
+      </div>
+    </div>
+
+    <!-- Seção Meus Aplicativos -->
+    <div class="secao-aplicativos">
+      <h2 class="titulo-secao">Meus aplicativos</h2>
+      <p class="subtitulo-secao">Acesse seu painel administrativo e gerencie os serviços da WEC Brasil</p>
+
+      <div class="aplicativos-grid" id="aplicativosContainer">
+        <!-- Card 1: Registro de Serviços -->
+        <div class="card-aplicativo" id="cardRegistroServicos" role="button" tabindex="0" style="cursor:pointer;">
+          <div class="icon-aplicativo">
+            <i class="bi bi-clipboard-check"></i>
+          </div>
+          <div class="info-aplicativo">
+            <h3>Registro de Serviços</h3>
+            <p>Gerencie registros de serviços, usuários, materiais, refeições e gere relatórios completos.</p>
+          </div>
+        </div>
+
+        <!-- Card 2: Extrato de Remessa -->
+        <div class="card-aplicativo" id="cardExtratoRemessa" role="button" tabindex="0" style="cursor:pointer;">
+          <div class="icon-aplicativo">
+            <i class="bi bi-file-earmark-pdf"></i>
+          </div>
+          <div class="info-aplicativo">
+            <h3>Extrato de Remessa</h3>
+            <p>Processe e exporte os extratos de remessa com informações detalhadas de transações.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    const { createClient } = window.supabase;
+    const supabase = createClient(
+      'https://xqwubmknwvvonjzaecmk.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhxd3VibWtud3Z2b25qemFlY21rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQwODY2OTQsImV4cCI6MjA2OTY2MjY5NH0._42N0mZO4NcLPcCG9YMB0_hkMTLF5tCdlPZYagN3vIk'
+    );
+
+    // Logout mínimo (evita erro "logout is not defined")
+    async function logout() {
+      try {
+        await supabase.auth.signOut();
+      } catch (err) {
+        console.error('Erro ao deslogar:', err);
+      } finally {
+        sessionStorage.removeItem('fromAdmin');
+        localStorage.removeItem('usuarioLogado');
+        window.location.href = './index.html';
+      }
+    }
+
+    // inicializa após DOM pronto — evita acionar elementos que ainda não existem
+    document.addEventListener('DOMContentLoaded', () => {
+      (async function initAdminPage() {
+        try {
+          const { data: { user }, error: userError } = await supabase.auth.getUser();
+          if (userError || !user) return window.location.href = './index.html';
+
+          const { data: perfil, error: perfilError } = await supabase
+            .from('usuarios')
+            .select('tipo, nome')
+            .eq('user_id', user.id)
+            .single();
+
+          if (perfilError || !perfil || perfil.tipo !== 'admin') {
+            return window.location.href = './index.html';
+          }
+
+          // NÃO use optional chaining no LHS — verifique o elemento antes de atribuir
+          const usuarioNomeEl = document.getElementById('usuarioNome');
+          if (usuarioNomeEl) usuarioNomeEl.textContent = perfil.nome || user.email;
+        } catch (err) {
+          console.error(err);
+          window.location.href = './index.html';
+        }
+      })();
+
+      const card = document.getElementById('cardRegistroServicos');
+      if (card) {
+        card.addEventListener('click', () => {
+          sessionStorage.setItem('fromAdmin', '1');
+          window.location.href = './index.html';
+        });
+        card.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            card.click();
+          }
+        });
+      }
+
+      // Event listener para o card de Extrato de Remessa (agora aponta para ./extrato-remessa/index.html)
+      const cardExtrato = document.getElementById('cardExtratoRemessa');
+      if (cardExtrato) {
+        cardExtrato.addEventListener('click', () => {
+          // marca que veio do admin e navega para a versão JS do app (mesma aba)
+          sessionStorage.setItem('fromAdmin', '1');
+          window.location.href = './extrato-remessa/index.html';
+        });
+        cardExtrato.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            cardExtrato.click();
+          }
+        });
+      }
+    });
+  </script>
+</body>
+</html>
