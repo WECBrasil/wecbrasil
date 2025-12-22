@@ -14,9 +14,14 @@
 </head>
 <body class="p-4">
   <div class="container">
+
+    <div class="mb-3">
+      <button id="btnVoltarMeusAplicativos" class="btn btn-outline-primary hidden">← Meus aplicativos</button>
+    </div>
+
     <header class="mb-4 text-center">
       <div class="d-flex justify-content-center align-items-center mb-2">
-        <img src="/logo.png" alt="Logo WEC Brasil" height="80" class="me-2">
+        <img src="/images/wec-logo.png" alt="Logo WEC Brasil" height="80" class="me-2">
         <span class="fs-2 fw-bold">WEC Brasil</span>
       </div>
       <h1 class="fs-4">Registro de Serviços</h1>
@@ -282,56 +287,86 @@
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhxd3VibWtud3Z2b25qemFlY21rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQwODY2OTQsImV4cCI6MjA2OTY2MjY5NH0._42N0mZO4NcLPcCG9YMB0_hkMTLF5tCdlPZYagN3vIk'
       );
 
-      async function verificarLogin() {
-        const { data: { user }, error } = await supabase.auth.getUser();
+      // ...existing code...
 
-        if (!user) {
-          document.getElementById('loginCard').classList.remove('hidden');
-          document.getElementById('registroCard').classList.add('hidden');
-          document.getElementById('listagemRegistrosCard').classList.add('hidden');
-          return;
-        }
+async function verificarLogin() {
+  try {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      document.getElementById('loginCard').classList.remove('hidden');
+      document.getElementById('registroCard')?.classList.add('hidden');
+      document.getElementById('listagemRegistrosCard')?.classList.add('hidden');
+      return;
+    }
 
-        const { data: perfil, error: perfilError } = await supabase
-          .from('usuarios')
-          .select('tipo, nome, liberado_relatorio_geral, liberado_relatorio_refeicoes')
-          .eq('user_id', user.id)
-          .single();
+    const { data: perfil, error: perfilError } = await supabase
+      .from('usuarios')
+      .select('tipo, nome, liberado_relatorio_geral, liberado_relatorio_refeicoes')
+      .eq('user_id', user.id)
+      .single();
 
-        if (perfilError || !perfil) {
-          alert('Erro ao carregar perfil: ' + (perfilError?.message || 'Perfil não encontrado.'));
-          await supabase.auth.signOut();
-          return location.reload();
-        }
+    if (perfilError || !perfil) {
+      console.error('Erro ao carregar perfil:', perfilError);
+      await supabase.auth.signOut();
+      return location.reload();
+    }
 
-        const usuarioLogado = {
-          id: user.id,
-          email: user.email,
-          tipo: perfil.tipo,
-          nome: perfil.nome,
-          liberado_relatorio_geral: perfil.liberado_relatorio_geral,
-          liberado_relatorio_refeicoes: perfil.liberado_relatorio_refeicoes
-        };
+    const usuarioLogado = {
+      id: user.id,
+      email: user.email,
+      tipo: perfil.tipo,
+      nome: perfil.nome,
+      liberado_relatorio_geral: perfil.liberado_relatorio_geral,
+      liberado_relatorio_refeicoes: perfil.liberado_relatorio_refeicoes
+    };
 
-        localStorage.setItem('usuarioLogado', JSON.stringify(usuarioLogado));
-        document.getElementById('usuarioLogado').textContent = usuarioLogado.nome;
-        document.getElementById('registroCard')?.classList.remove('hidden');
-        document.getElementById('listagemRegistrosCard')?.classList.remove('hidden');
-        document.getElementById('loginCard')?.classList.add('hidden');
-        document.getElementById('cadastroIndividualCard')?.classList.add('hidden');
-        // Mostra áreas de admin/liberados
-        if (usuarioLogado.tipo === 'admin') {
-        document.getElementById('cadastroCard')?.classList.remove('hidden');
-         document.getElementById('gerenciarUsuariosCard')?.classList.remove('hidden');
-          document.getElementById('filtroUsuarioContainer')?.classList.remove('hidden');
-        }
-        if (usuarioLogado.liberado_relatorio_geral || usuarioLogado.tipo === 'admin') {
-        document.getElementById('relatorioCard')?.classList.remove('hidden');
-        }
-        if (usuarioLogado.liberado_relatorio_refeicoes || usuarioLogado.tipo === 'admin') {
-        document.getElementById('refeicoesCard')?.classList.remove('hidden');
-        }
+    // ✅ CORREÇÃO: Se for admin E NÃO estiver em uma sessão "dentro do app" (fromAdmin não definido)
+    // E TAMBÉM não esteja vindo de uma recarga/atualização (usar localStorage para rastrear)
+    const isInsideApp = sessionStorage.getItem('fromAdmin') || localStorage.getItem('admin_inside_app');
+    
+    if (usuarioLogado.tipo === 'admin' && !isInsideApp) {
+      window.location.href = './admin.html';
+      return;
+    }
+
+    // Se está dentro da aplicação, marca no localStorage para manter mesmo após recarregar
+    if (isInsideApp) {
+      localStorage.setItem('admin_inside_app', '1');
+    }
+
+    // Guarda estado e mostra interface
+    localStorage.setItem('usuarioLogado', JSON.stringify(usuarioLogado));
+    document.getElementById('usuarioLogado').textContent = usuarioLogado.nome;
+    document.getElementById('registroCard')?.classList.remove('hidden');
+    document.getElementById('listagemRegistrosCard')?.classList.remove('hidden');
+    document.getElementById('loginCard')?.classList.add('hidden');
+    document.getElementById('cadastroIndividualCard')?.classList.add('hidden');
+
+    if (usuarioLogado.liberado_relatorio_geral || usuarioLogado.tipo === 'admin') {
+      document.getElementById('relatorioCard')?.classList.remove('hidden');
+    }
+    if (usuarioLogado.liberado_relatorio_refeicoes || usuarioLogado.tipo === 'admin') {
+      document.getElementById('refeicoesCard')?.classList.remove('hidden');
+    }
+    if (usuarioLogado.tipo === 'admin') {
+      document.getElementById('gerenciarUsuariosCard')?.classList.remove('hidden');
+      document.getElementById('cadastroCard')?.classList.remove('hidden');
+    }
+
+    // Mostra o botão "Voltar — Meus aplicativos" apenas se veio do admin.html
+    const voltarBtn = document.getElementById('btnVoltarMeusAplicativos');
+    if (voltarBtn) {
+      if (sessionStorage.getItem('fromAdmin') || localStorage.getItem('admin_inside_app')) {
+        voltarBtn.classList.remove('hidden');
+      } else {
+        voltarBtn.classList.add('hidden');
       }
+    }
+  } catch (err) {
+    console.error('verificarLogin erro:', err);
+    document.getElementById('loginCard')?.classList.remove('hidden');
+  }
+}
 
       document.getElementById('formLogin')?.addEventListener('submit', async function (e) {
         e.preventDefault();
@@ -1781,7 +1816,23 @@ document.getElementById('btnEsqueceuSenha')?.addEventListener('click', async fun
   alert('Se este email estiver cadastrado, você receberá instruções para redefinir sua senha.');
 });
     </script>
-  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+  (function () {
+  const btn = document.getElementById('btnVoltarMeusAplicativos');
+  if (btn) {
+    btn.addEventListener('click', () => {
+      // Limpa as flags ao retornar
+      sessionStorage.removeItem('fromAdmin');
+      localStorage.removeItem('admin_inside_app');
+      window.location.href = './admin.html';
+    });
+  }
+})();
+</script>
+
+</div>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
