@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Registro de Serviços - WEC Brasil</title>
+  <!-- Recomendação: Hospede bibliotecas localmente para evitar bloqueios de Tracking Prevention -->
+  <!-- Exemplo: Baixe bootstrap.min.css e referencie como <link rel="stylesheet" href="./libs/bootstrap.min.css"> -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
   <style>
@@ -248,423 +250,564 @@
     </div>
 
     <!-- Scripts Externos -->
+    <!-- Recomendação: Hospede localmente para evitar bloqueios -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
-      // ========== VARIÁVEIS GLOBAIS ==========
-      let listaCache = [];
-      let registroEditando = null;
+      // ========== INICIALIZAÇÃO ÚNICA ==========
+      // Evita execução múltipla do script (causa redeclaração de 'supabase')
+      if (!window.appInitialized) {
+        window.appInitialized = true;
 
-      // ========== UTILITÁRIOS ==========
-      function formatDateISOtoBR(iso) {
-        if (!iso) return '';
-        const [ano, mes, dia] = iso.split('-');
-        return `${dia}/${mes}/${ano}`;
-      }
+        // ========== VARIÁVEIS GLOBAIS ==========
+        let listaCache = [];
+        let registroEditando = null;
 
-      function dataBRParaISO(dataBR) {
-        const partes = dataBR.split('/');
-        if (partes.length !== 3) return null;
-        const [dia, mes, ano] = partes;
-        return `${ano}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`;
-      }
+        // ========== UTILITÁRIOS ==========
+        function formatDateISOtoBR(iso) {
+          if (!iso) return '';
+          const [ano, mes, dia] = iso.split('-');
+          return `${dia}/${mes}/${ano}`;
+        }
 
-      // ========== CONFIGURAÇÃO SUPABASE ==========
-      const { createClient } = window.supabase;
-      const supabase = createClient(
-        'https://xqwubmknwvvonjzaecmk.supabase.co',
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhxd3VibWtud3Z2b25qemFlY21rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQwODY2OTQsImV4cCI6MjA2OTY2MjY5NH0._42N0mZO4NcLPcCG9YMB0_hkMTLF5tCdlPZYagN3vIk'
-      );
+        function dataBRParaISO(dataBR) {
+          const partes = dataBR.split('/');
+          if (partes.length !== 3) return null;
+          const [dia, mes, ano] = partes;
+          return `${ano}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`;
+        }
 
-      // ========== AUTENTICAÇÃO ==========
-      async function verificarLogin() {
-        try {
-          const { data: { user }, error: userError } = await supabase.auth.getUser();
-          if (userError || !user) {
+        // ========== CONFIGURAÇÃO SUPABASE ==========
+        // Verificação para evitar redeclaração
+        if (typeof supabase === 'undefined') {
+          const { createClient } = window.supabase;
+          supabase = createClient(
+            'https://xqwubmknwvvonjzaecmk.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhxd3VibWtud3Z2b25qemFlY21rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQwODY2OTQsImV4cCI6MjA2OTY2MjY5NH0._42N0mZO4NcLPcCG9YMB0_hkMTLF5tCdlPZYagN3vIk'
+          );
+        }
+
+        // ========== AUTENTICAÇÃO ==========
+        async function verificarLogin() {
+          try {
+            const { data: { user }, error: userError } = await supabase.auth.getUser();
+            if (userError || !user) {
+              mostrarLogin();
+              return;
+            }
+
+            const { data: perfil, error: perfilError } = await supabase
+              .from('usuarios')
+              .select('tipo, nome, liberado_relatorio_geral, liberado_relatorio_refeicoes')
+              .eq('user_id', user.id)
+              .single();
+
+            if (perfilError || !perfil) {
+              console.error('Erro ao carregar perfil:', perfilError);
+              await supabase.auth.signOut();
+              return location.reload();
+            }
+
+            const usuarioLogado = {
+              id: user.id,
+              email: user.email,
+              tipo: perfil.tipo,
+              nome: perfil.nome,
+              liberado_relatorio_geral: perfil.liberado_relatorio_geral,
+              liberado_relatorio_refeicoes: perfil.liberado_relatorio_refeicoes
+            };
+
+            const isInsideApp = sessionStorage.getItem('fromAdmin') || localStorage.getItem('admin_inside_app');
+            if (usuarioLogado.tipo === 'admin' && !isInsideApp) {
+              window.location.href = './admin.html';
+              return;
+            }
+
+            if (isInsideApp) {
+              localStorage.setItem('admin_inside_app', '1');
+            }
+
+            localStorage.setItem('usuarioLogado', JSON.stringify(usuarioLogado));
+            document.getElementById('usuarioLogado').textContent = usuarioLogado.nome;
+            mostrarInterfaceUsuario(usuarioLogado);
+
+            const voltarBtn = document.getElementById('btnVoltarMeusAplicativos');
+            if (voltarBtn) {
+              voltarBtn.classList.toggle('hidden', !(sessionStorage.getItem('fromAdmin') || localStorage.getItem('admin_inside_app')));
+            }
+          } catch (err) {
+            console.error('verificarLogin erro:', err);
             mostrarLogin();
-            return;
           }
-
-          const { data: perfil, error: perfilError } = await supabase
-            .from('usuarios')
-            .select('tipo, nome, liberado_relatorio_geral, liberado_relatorio_refeicoes')
-            .eq('user_id', user.id)
-            .single();
-
-          if (perfilError || !perfil) {
-            console.error('Erro ao carregar perfil:', perfilError);
-            await supabase.auth.signOut();
-            return location.reload();
-          }
-
-          const usuarioLogado = {
-            id: user.id,
-            email: user.email,
-            tipo: perfil.tipo,
-            nome: perfil.nome,
-            liberado_relatorio_geral: perfil.liberado_relatorio_geral,
-            liberado_relatorio_refeicoes: perfil.liberado_relatorio_refeicoes
-          };
-
-          const isInsideApp = sessionStorage.getItem('fromAdmin') || localStorage.getItem('admin_inside_app');
-          if (usuarioLogado.tipo === 'admin' && !isInsideApp) {
-            window.location.href = './admin.html';
-            return;
-          }
-
-          if (isInsideApp) {
-            localStorage.setItem('admin_inside_app', '1');
-          }
-
-          localStorage.setItem('usuarioLogado', JSON.stringify(usuarioLogado));
-          document.getElementById('usuarioLogado').textContent = usuarioLogado.nome;
-          mostrarInterfaceUsuario(usuarioLogado);
-
-          const voltarBtn = document.getElementById('btnVoltarMeusAplicativos');
-          if (voltarBtn) {
-            voltarBtn.classList.toggle('hidden', !(sessionStorage.getItem('fromAdmin') || localStorage.getItem('admin_inside_app')));
-          }
-        } catch (err) {
-          console.error('verificarLogin erro:', err);
-          mostrarLogin();
         }
-      }
 
-      function mostrarLogin() {
-        document.getElementById('loginCard').classList.remove('hidden');
-        document.getElementById('registroCard')?.classList.add('hidden');
-        document.getElementById('listagemRegistrosCard')?.classList.add('hidden');
-      }
-
-      function mostrarInterfaceUsuario(usuario) {
-        document.getElementById('registroCard')?.classList.remove('hidden');
-        document.getElementById('listagemRegistrosCard')?.classList.remove('hidden');
-        document.getElementById('loginCard')?.classList.add('hidden');
-        document.getElementById('cadastroIndividualCard')?.classList.add('hidden');
-
-        if (usuario.liberado_relatorio_geral || usuario.tipo === 'admin') {
-          document.getElementById('relatorioCard')?.classList.remove('hidden');
+        function mostrarLogin() {
+          document.getElementById('loginCard').classList.remove('hidden');
+          document.getElementById('registroCard')?.classList.add('hidden');
+          document.getElementById('listagemRegistrosCard')?.classList.add('hidden');
         }
-        if (usuario.liberado_relatorio_refeicoes || usuario.tipo === 'admin') {
-          document.getElementById('refeicoesCard')?.classList.remove('hidden');
+
+        function mostrarInterfaceUsuario(usuario) {
+          document.getElementById('registroCard')?.classList.remove('hidden');
+          document.getElementById('listagemRegistrosCard')?.classList.remove('hidden');
+          document.getElementById('loginCard')?.classList.add('hidden');
+          document.getElementById('cadastroIndividualCard')?.classList.add('hidden');
+
+          if (usuario.liberado_relatorio_geral || usuario.tipo === 'admin') {
+            document.getElementById('relatorioCard')?.classList.remove('hidden');
+          }
+          if (usuario.liberado_relatorio_refeicoes || usuario.tipo === 'admin') {
+            document.getElementById('refeicoesCard')?.classList.remove('hidden');
+          }
+          if (usuario.tipo === 'admin') {
+            document.getElementById('gerenciarUsuariosCard')?.classList.remove('hidden');
+            document.getElementById('cadastroCard')?.classList.remove('hidden');
+          }
         }
-        if (usuario.tipo === 'admin') {
-          document.getElementById('gerenciarUsuariosCard')?.classList.remove('hidden');
-          document.getElementById('cadastroCard')?.classList.remove('hidden');
-        }
-      }
 
-      async function logout() {
-        await supabase.auth.signOut();
-        localStorage.removeItem('usuarioLogado');
-        location.reload();
-      }
-
-      // ========== EVENT LISTENERS PRINCIPAIS ==========
-      document.getElementById('toggleSenha').addEventListener('click', function () {
-        const senhaInput = document.getElementById('loginSenha');
-        const icon = this.querySelector('i');
-        const isPassword = senhaInput.type === 'password';
-        senhaInput.type = isPassword ? 'text' : 'password';
-        icon.classList.toggle('bi-eye', !isPassword);
-        icon.classList.toggle('bi-eye-slash', isPassword);
-      });
-
-      document.getElementById('formLogin')?.addEventListener('submit', async function (e) {
-        e.preventDefault();
-        const email = document.getElementById('loginUsuario').value;
-        const senha = document.getElementById('loginSenha').value;
-        const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
-        if (error) {
-          alert('Erro ao fazer login: ' + error.message);
-        } else {
+        async function logout() {
+          await supabase.auth.signOut();
+          localStorage.removeItem('usuarioLogado');
           location.reload();
         }
-      });
 
-      document.getElementById('btnMostrarCadastro').addEventListener('click', () => {
-        document.getElementById('loginCard').classList.add('hidden');
-        document.getElementById('cadastroIndividualCard').classList.remove('hidden');
-      });
-
-      document.getElementById('btnVoltarLogin').addEventListener('click', () => {
-        document.getElementById('cadastroIndividualCard').classList.add('hidden');
-        document.getElementById('loginCard').classList.remove('hidden');
-      });
-
-      document.getElementById('formCadastroIndividual')?.addEventListener('submit', async function (e) {
-        e.preventDefault();
-        const nome = document.getElementById('nomeCadastroIndividual').value.trim();
-        const email = document.getElementById('emailCadastroIndividual').value.trim();
-        const senha = document.getElementById('senhaCadastroIndividual').value;
-        if (!nome || !email || !senha) {
-          alert('Preencha todos os campos.');
-          return;
-        }
-        const { data: signUpData, error } = await supabase.auth.signUp({
-          email,
-          password: senha,
-          options: { data: { nome, tipo: 'comum' } }
+        // ========== EVENT LISTENERS PRINCIPAIS ==========
+        document.getElementById('toggleSenha').addEventListener('click', function () {
+          const senhaInput = document.getElementById('loginSenha');
+          const icon = this.querySelector('i');
+          const isPassword = senhaInput.type === 'password';
+          senhaInput.type = isPassword ? 'text' : 'password';
+          icon.classList.toggle('bi-eye', !isPassword);
+          icon.classList.toggle('bi-eye-slash', isPassword);
         });
-        if (error) {
-          alert('Erro ao cadastrar: ' + error.message);
-          return;
-        }
-        const userId = signUpData?.user?.id;
-        if (!userId) {
-          alert('Usuário criado, mas ID não obtido.');
-          return;
-        }
-        const { data: existingUser, error: fetchError } = await supabase
-          .from('usuarios')
-          .select('user_id')
-          .eq('user_id', userId)
-          .single();
-        if (fetchError && fetchError.code !== 'PGRST116') {
-          alert('Erro ao verificar usuário: ' + fetchError.message);
-          return;
-        }
-        if (!existingUser) {
-          const { error: insertError } = await supabase
-            .from('usuarios')
-            .insert([{ user_id: userId, nome, tipo: 'comum', email }]);
-          if (insertError) {
-            alert('Erro ao salvar dados: ' + insertError.message);
+
+        document.getElementById('formLogin')?.addEventListener('submit', async function (e) {
+          e.preventDefault();
+          const email = document.getElementById('loginUsuario').value;
+          const senha = document.getElementById('loginSenha').value;
+          const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
+          if (error) {
+            alert('Erro ao fazer login: ' + error.message);
+          } else {
+            location.reload();
+          }
+        });
+
+        document.getElementById('btnMostrarCadastro').addEventListener('click', () => {
+          document.getElementById('loginCard').classList.add('hidden');
+          document.getElementById('cadastroIndividualCard').classList.remove('hidden');
+        });
+
+        document.getElementById('btnVoltarLogin').addEventListener('click', () => {
+          document.getElementById('cadastroIndividualCard').classList.add('hidden');
+          document.getElementById('loginCard').classList.remove('hidden');
+        });
+
+        document.getElementById('formCadastroIndividual')?.addEventListener('submit', async function (e) {
+          e.preventDefault();
+          const nome = document.getElementById('nomeCadastroIndividual').value.trim();
+          const email = document.getElementById('emailCadastroIndividual').value.trim();
+          const senha = document.getElementById('senhaCadastroIndividual').value;
+          if (!nome || !email || !senha) {
+            alert('Preencha todos os campos.');
             return;
           }
-        }
-        alert('Cadastro realizado com sucesso. Faça login.');
-        this.reset();
-        document.getElementById('btnVoltarLogin')?.click();
-      });
-
-      document.getElementById('formAlterarSenha').addEventListener('submit', async function (e) {
-        e.preventDefault();
-        const senhaAtual = document.getElementById('senhaAtual').value;
-        const novaSenha = document.getElementById('novaSenha').value;
-        const usuario = JSON.parse(localStorage.getItem('usuarioLogado'));
-        const { error: loginError } = await supabase.auth.signInWithPassword({
-          email: usuario.email,
-          password: senhaAtual
+          const { data: signUpData, error } = await supabase.auth.signUp({
+            email,
+            password: senha,
+            options: { data: { nome, tipo: 'comum' } }
+          });
+          if (error) {
+            alert('Erro ao cadastrar: ' + error.message);
+            return;
+          }
+          const userId = signUpData?.user?.id;
+          if (!userId) {
+            alert('Usuário criado, mas ID não obtido.');
+            return;
+          }
+          const { data: existingUser, error: fetchError } = await supabase
+            .from('usuarios')
+            .select('user_id')
+            .eq('user_id', userId)
+            .single();
+          if (fetchError && fetchError.code !== 'PGRST116') {
+            alert('Erro ao verificar usuário: ' + fetchError.message);
+            return;
+          }
+          if (!existingUser) {
+            const { error: insertError } = await supabase
+              .from('usuarios')
+              .insert([{ user_id: userId, nome, tipo: 'comum', email }]);
+            if (insertError) {
+              alert('Erro ao salvar dados: ' + insertError.message);
+              return;
+            }
+          }
+          alert('Cadastro realizado com sucesso. Faça login.');
+          this.reset();
+          document.getElementById('btnVoltarLogin')?.click();
         });
-        if (loginError) {
-          alert('Senha atual incorreta.');
-          return;
-        }
-        const { error: updateError } = await supabase.auth.updateUser({ password: novaSenha });
-        if (updateError) {
-          alert('Erro ao alterar senha: ' + updateError.message);
-          return;
-        }
-        alert('Senha alterada com sucesso.');
-        this.reset();
-        document.getElementById('alterarSenhaCard').classList.add('hidden');
-      });
 
-      document.getElementById('btnEsqueceuSenha')?.addEventListener('click', async function () {
-        const email = prompt('Digite o seu email para redefinir a senha:');
-        if (!email) return;
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: 'https://wecbrasil.github.io/wecbrasil/reset.html'
+        document.getElementById('formAlterarSenha').addEventListener('submit', async function (e) {
+          e.preventDefault();
+          const senhaAtual = document.getElementById('senhaAtual').value;
+          const novaSenha = document.getElementById('novaSenha').value;
+          const usuario = JSON.parse(localStorage.getItem('usuarioLogado'));
+          const { error: loginError } = await supabase.auth.signInWithPassword({
+            email: usuario.email,
+            password: senhaAtual
+          });
+          if (loginError) {
+            alert('Senha atual incorreta.');
+            return;
+          }
+          const { error: updateError } = await supabase.auth.updateUser({ password: novaSenha });
+          if (updateError) {
+            alert('Erro ao alterar senha: ' + updateError.message);
+            return;
+          }
+          alert('Senha alterada com sucesso.');
+          this.reset();
+          document.getElementById('alterarSenhaCard').classList.add('hidden');
         });
-        if (error) {
-          alert('Erro ao enviar email: ' + error.message);
-        } else {
-          alert('Se este email estiver cadastrado, você receberá instruções.');
-        }
-      });
 
-      // ========== FUNÇÕES DE UI ==========
-      function mostrarAlterarSenha() {
-        document.getElementById('alterarSenhaCard').classList.remove('hidden');
-      }
+        document.getElementById('btnEsqueceuSenha')?.addEventListener('click', async function () {
+          const email = prompt('Digite o seu email para redefinir a senha:');
+          if (!email) return;
+          const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: 'https://wecbrasil.github.io/wecbrasil/reset.html'
+          });
+          if (error) {
+            alert('Erro ao enviar email: ' + error.message);
+          } else {
+            alert('Se este email estiver cadastrado, você receberá instruções.');
+          }
+        });
 
-      function mostrarCamposServico() {
-        const tipo = document.getElementById('tipoServico').value;
-        const detalhes = document.getElementById('detalhesServico');
-        detalhes.innerHTML = '';
-        const hoje = new Date().toISOString().split('T')[0];
-
-        if (tipo === 'lavanderia') {
-          detalhes.innerHTML = `
-            <label>Data:</label>
-            <input type="date" class="form-control mb-2" id="dataLavanderia" value="${hoje}" required>
-            <label>Quantidade de lavagens:</label>
-            <input type="number" class="form-control mb-2" id="qtdLavagens" min="0" required>
-            <label>Quantidade de secagens:</label>
-            <input type="number" class="form-control mb-2" id="qtdSecagens" min="0" required>
-          `;
-        } else if (tipo === 'carro') {
-          detalhes.innerHTML = `
-            <label>Data:</label>
-            <input type="date" class="form-control mb-2" id="dataCarro" value="${hoje}" required>
-            <label>KM Inicial:</label>
-            <input type="number" class="form-control mb-2" id="kmInicial" min="0" required>
-            <label>KM Final:</label>
-            <input type="number" class="form-control mb-2" id="kmFinal" min="0" required>
-            <label>Horário de saída:</label>
-            <input type="time" class="form-control mb-2" id="horaSaida">
-            <label>Horário de chegada:</label>
-            <input type="time" class="form-control mb-2" id="horaChegada">
-            <label>Uso:</label>
-            <select class="form-select mb-2" id="usoCarro" onchange="mostrarCampoDepartamento()">
-              <option value="pessoal">Pessoal</option>
-              <option value="departamento">Departamento</option>
-            </select>
-            <div id="campoDepartamento"></div>
-            <label>Quantidade de uso da TAG:</label>
-            <input type="number" class="form-control mb-2" id="qtdTag" min="0">
-          `;
-        } else if (tipo === 'copias') {
-          detalhes.innerHTML = `
-            <label>Data:</label>
-            <input type="date" class="form-control mb-2" id="dataCopias" value="${hoje}" required>
-            <label>Quantidade:</label>
-            <input type="number" class="form-control mb-2" id="qtdCopias" min="1" required>
-            <label>Tipo de impressão:</label>
-            <select class="form-select mb-2" id="tipoImpressao">
-              <option value="preto">Preto e Branco</option>
-              <option value="colorida">Colorida</option>
-            </select>
-          `;
-        } else if (tipo === 'refeicoes') {
-          detalhes.innerHTML = `
-            <label>Selecionar dias e quantidades:</label>
-            <div id="diasRefeicoes" class="mb-2"></div>
-            <button type="button" class="btn btn-outline-primary btn-sm mb-2" onclick="adicionarDiaRefeicao()">Adicionar Dia</button>
-          `;
-        } else if (tipo === 'hospedagem') {
-          detalhes.innerHTML = `
-            <label>Data de entrada:</label>
-            <input type="date" class="form-control mb-2" id="entrada" required>
-            <label>Data de saída:</label>
-            <input type="date" class="form-control mb-2" id="saida" onchange="validarHospedagem()" required>
-            <div id="erroData" class="text-danger"></div>
-          `;
-        }
-      }
-
-      function mostrarCampoDepartamento() {
-        const uso = document.getElementById('usoCarro').value;
-        const campo = document.getElementById('campoDepartamento');
-        campo.innerHTML = uso === 'departamento' ? `
-          <label>Departamento:</label>
-          <input type="text" class="form-control mb-2" id="departamento">
-        ` : '';
-      }
-
-      function adicionarDiaRefeicao() {
-        const container = document.getElementById('diasRefeicoes');
-        const diaDiv = document.createElement('div');
-        diaDiv.classList.add('mb-2', 'linha-dia');
-        diaDiv.innerHTML = `
-          <div class="d-flex align-items-center">
-            <input type="date" class="form-control me-2 data-refeicao" required>
-            <input type="number" class="form-control qtd-refeicao" placeholder="Quantidade" min="1" required>
-            <button type="button" class="btn btn-danger btn-sm ms-2" onclick="this.parentElement.parentElement.remove()">X</button>
-          </div>
-        `;
-        container.appendChild(diaDiv);
-      }
-
-      function validarHospedagem() {
-        const entrada = document.getElementById('entrada').value;
-        const saida = document.getElementById('saida').value;
-        const erro = document.getElementById('erroData');
-        erro.textContent = entrada && saida && saida < entrada ? 'Data de saída anterior à entrada.' : '';
-      }
-
-      // ========== FUNÇÕES DE DADOS ==========
-      async function prepararRegistro() {
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-        if (userError || !user) {
-          alert('Usuário não autenticado.');
-          return;
+        // ========== FUNÇÕES DE UI ==========
+        function mostrarAlterarSenha() {
+          document.getElementById('alterarSenhaCard').classList.remove('hidden');
         }
 
-        const tipo = document.getElementById('tipoServico').value;
-        const registro = { user_id: user.id, tipo, data: new Date().toISOString().split('T')[0] };
+        function mostrarCamposServico() {
+          const tipo = document.getElementById('tipoServico').value;
+          const detalhes = document.getElementById('detalhesServico');
+          detalhes.innerHTML = '';
+          const hoje = new Date().toISOString().split('T')[0];
 
-        // Lógica de coleta de dados por tipo (abreviada para brevidade, mas mantida)
-        if (tipo === 'lavanderia') {
-          const lavagens = document.getElementById('qtdLavagens').value;
-          const secagens = document.getElementById('qtdSecagens').value;
-          const data = document.getElementById('dataLavanderia').value;
-          if (!lavagens || !secagens || !data) return alert('Preencha todos os campos.');
-          registro.qtdlavagens = parseInt(lavagens);
-          registro.qtdsecagens = parseInt(secagens);
-          registro.data = data;
-        } else if (tipo === 'carro') {
-          // Similar para outros tipos...
-          // (Mantido como no original, mas limpo)
-        } // ... (outros tipos)
+          if (tipo === 'lavanderia') {
+            detalhes.innerHTML = `
+              <label>Data:</label>
+              <input type="date" class="form-control mb-2" id="dataLavanderia" value="${hoje}" required>
+              <label>Quantidade de lavagens:</label>
+              <input type="number" class="form-control mb-2" id="qtdLavagens" min="0" required>
+              <label>Quantidade de secagens:</label>
+              <input type="number" class="form-control mb-2" id="qtdSecagens" min="0" required>
+            `;
+          } else if (tipo === 'carro') {
+            detalhes.innerHTML = `
+              <label>Data:</label>
+              <input type="date" class="form-control mb-2" id="dataCarro" value="${hoje}" required>
+              <label>KM Inicial:</label>
+              <input type="number" class="form-control mb-2" id="kmInicial" min="0" required>
+              <label>KM Final:</label>
+              <input type="number" class="form-control mb-2" id="kmFinal" min="0" required>
+              <label>Horário de saída:</label>
+              <input type="time" class="form-control mb-2" id="horaSaida">
+              <label>Horário de chegada:</label>
+              <input type="time" class="form-control mb-2" id="horaChegada">
+              <label>Uso:</label>
+              <select class="form-select mb-2" id="usoCarro" onchange="mostrarCampoDepartamento()">
+                <option value="pessoal">Pessoal</option>
+                <option value="departamento">Departamento</option>
+              </select>
+              <div id="campoDepartamento"></div>
+              <label>Quantidade de uso da TAG:</label>
+              <input type="number" class="form-control mb-2" id="qtdTag" min="0">
+            `;
+          } else if (tipo === 'copias') {
+            detalhes.innerHTML = `
+              <label>Data:</label>
+              <input type="date" class="form-control mb-2" id="dataCopias" value="${hoje}" required>
+              <label>Quantidade:</label>
+              <input type="number" class="form-control mb-2" id="qtdCopias" min="1" required>
+              <label>Tipo de impressão:</label>
+              <select class="form-select mb-2" id="tipoImpressao">
+                <option value="preto">Preto e Branco</option>
+                <option value="colorida">Colorida</option>
+              </select>
+            `;
+          } else if (tipo === 'refeicoes') {
+            detalhes.innerHTML = `
+              <label>Selecionar dias e quantidades:</label>
+              <div id="diasRefeicoes" class="mb-2"></div>
+              <button type="button" class="btn btn-outline-primary btn-sm mb-2" onclick="adicionarDiaRefeicao()">Adicionar Dia</button>
+            `;
+          } else if (tipo === 'hospedagem') {
+            detalhes.innerHTML = `
+              <label>Data de entrada:</label>
+              <input type="date" class="form-control mb-2" id="entrada" required>
+              <label>Data de saída:</label>
+              <input type="date" class="form-control mb-2" id="saida" onchange="validarHospedagem()" required>
+              <div id="erroData" class="text-danger"></div>
+            `;
+          }
+        }
 
-        const { error } = await supabase.from('registros').insert([registro]);
-        if (error) {
-          console.error('Erro ao salvar:', error);
-          alert('Erro ao salvar registro.');
-        } else {
-          alert('Registro salvo!');
-          document.getElementById('formUso').reset();
-          mostrarCamposServico();
+        function mostrarCampoDepartamento() {
+          const uso = document.getElementById('usoCarro').value;
+          const campo = document.getElementById('campoDepartamento');
+          campo.innerHTML = uso === 'departamento' ? `
+            <label>Departamento:</label>
+            <input type="text" class="form-control mb-2" id="departamento">
+          ` : '';
+        }
+
+        function adicionarDiaRefeicao() {
+          const container = document.getElementById('diasRefeicoes');
+          const diaDiv = document.createElement('div');
+          diaDiv.classList.add('mb-2', 'linha-dia');
+          diaDiv.innerHTML = `
+            <div class="d-flex align-items-center">
+              <input type="date" class="form-control me-2 data-refeicao" required>
+              <input type="number" class="form-control qtd-refeicao" placeholder="Quantidade" min="1" required>
+              <button type="button" class="btn btn-danger btn-sm ms-2" onclick="this.parentElement.parentElement.remove()">X</button>
+            </div>
+          `;
+          container.appendChild(diaDiv);
+        }
+
+        function validarHospedagem() {
+          const entrada = document.getElementById('entrada').value;
+          const saida = document.getElementById('saida').value;
+          const erro = document.getElementById('erroData');
+          erro.textContent = entrada && saida && saida < entrada ? 'Data de saída anterior à entrada.' : '';
+        }
+
+        // ========== FUNÇÕES DE DADOS ==========
+        async function prepararRegistro() {
+          const { data: { user }, error: userError } = await supabase.auth.getUser();
+          if (userError || !user) {
+            alert('Usuário não autenticado.');
+            return;
+          }
+
+          const tipo = document.getElementById('tipoServico').value;
+          const registro = { user_id: user.id, tipo, data: new Date().toISOString().split('T')[0] };
+
+          // Lógica de coleta de dados por tipo (abreviada para brevidade, mas mantida)
+          if (tipo === 'lavanderia') {
+            const lavagens = document.getElementById('qtdLavagens').value;
+            const secagens = document.getElementById('qtdSecagens').value;
+            const data = document.getElementById('dataLavanderia').value;
+            if (!lavagens || !secagens || !data) return alert('Preencha todos os campos.');
+            registro.qtdlavagens = parseInt(lavagens);
+            registro.qtdsecagens = parseInt(secagens);
+            registro.data = data;
+          } else if (tipo === 'carro') {
+            // Similar para outros tipos...
+            // (Mantido como no original, mas limpo)
+          } // ... (outros tipos)
+
+          const { error } = await supabase.from('registros').insert([registro]);
+          if (error) {
+            console.error('Erro ao salvar:', error);
+            alert('Erro ao salvar registro.');
+          } else {
+            alert('Registro salvo!');
+            document.getElementById('formUso').reset();
+            mostrarCamposServico();
+            carregarListaRegistros();
+          }
+        }
+
+        document.getElementById('formUso').addEventListener('submit', (e) => {
+          e.preventDefault();
+          prepararRegistro();
+        });
+
+        function gerarDescricaoDetalhada(reg) {
+          // Mantido como no original, mas com switch limpo
+          switch (reg.tipo?.toLowerCase()) {
+            case 'lavanderia':
+              return `Lavagens: ${reg.qtdlavagens || 0}, Secagens: ${reg.qtdsecagens || 0}`;
+            // ... outros casos
+            default:
+              return reg.descricao || '-';
+          }
+        }
+
+        async function carregarListaRegistros(limite = 5, verTodos = false) {
+          // Lógica mantida, mas com try/catch melhorado
+          try {
+            const { data: userData } = await supabase.auth.getUser();
+            const user = userData?.user;
+            const usuarioLogado = JSON.parse(localStorage.getItem('usuarioLogado'));
+
+            // Verificar total de registros
+            let queryTotal = supabase.from('registros').select('*', { count: 'exact' });
+            if (usuarioLogado?.tipo === 'comum' && user) queryTotal = queryTotal.eq('user_id', user.id);
+            const { count: total } = await queryTotal;
+            if (total === 0) {
+              document.getElementById('listaRegistros').innerHTML = '<tr><td colspan="5" class="text-center text-muted">Nenhum registro encontrado.</td></tr>';
+              return;
+            }
+
+            // Consulta principal
+            let query = supabase.from('registros').select('*').order('data', { ascending: false });
+            const hoje = new Date();
+            const primeiroDia = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0];
+            const ultimoDia = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).toISOString().split('T')[0];
+            query = query.gte('data', primeiroDia).lte('data', ultimoDia);
+            if (usuarioLogado?.tipo === 'comum' && user) query = query.eq('user_id', user.id);
+            if (!verTodos && limite > 0) query = query.limit(limite);
+
+            const { data, error } = await query;
+            if (error) throw error;
+
+            listaCache = data || [];
+            if (!listaCache.length) {
+              document.getElementById('listaRegistros').innerHTML = '<tr><td colspan="5" class="text-center text-muted">Nenhum registro no mês atual.</td></tr>';
+              return;
+            }
+
+            const tbody = document.getElementById('listaRegistros');
+            tbody.innerHTML = listaCache.map(reg => `
+              <tr>
+                <td>${new Date(reg.data + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
+                <td>${reg.nome || reg.user_id || ''}</td>
+                <td>${reg.tipo || ''}</td>
+                <td>${gerarDescricaoDetalhada(reg)}</td>
+                <td>
+                  <button class="btn btn-sm btn-warning me-1" onclick="editarRegistro('${reg.id}')">Editar</button>
+                  <button class="btn btn-sm btn-danger" onclick="excluirRegistroSupabase('${reg.id}')">Excluir</button>
+                </td>
+              </tr>
+            `).join('');
+
+            // Botões Ver Todos/Recolher
+            document.getElementById('btnVerTodos').classList.toggle('hidden', verTodos);
+            document.getElementById('btnRecolher').classList.toggle('hidden', !verTodos);
+
+            // Info do período
+            const periodoInfo = document.getElementById('periodoInfo');
+            if (periodoInfo) {
+              const mes = hoje.toLocaleString('pt-BR', { month: 'long' });
+              periodoInfo.textContent = verTodos ? `Todos de ${mes}` : `Últimos ${limite} de ${mes}`;
+              periodoInfo.classList.remove('hidden');
+            }
+          } catch (err) {
+            console.error('Erro ao carregar registros:', err);
+            document.getElementById('listaRegistros').innerHTML = `<tr><td colspan="5" class="text-danger">Erro: ${err.message}</td></tr>`;
+          }
+        }
+
+        // Event listeners para botões
+        document.getElementById('btnVerTodos').addEventListener('click', () => carregarListaRegistros(null, true));
+        document.getElementById('btnRecolher').addEventListener('click', () => carregarListaRegistros(5, false));
+
+        async function excluirRegistroSupabase(id) {
+          if (!confirm('Excluir registro?')) return;
+          const { error } = await supabase.from('registros').delete().eq('id', id);
+          if (error) {
+            alert('Erro: ' + error.message);
+          } else {
+            alert('Excluído!');
+            carregarListaRegistros();
+          }
+        }
+
+        async function editarRegistro(id) {
+          const registro = listaCache.find(r => r.id == id);
+          if (!registro) return alert('Registro não encontrado.');
+          registroEditando = registro;
+          document.getElementById('edit-id').value = registro.id;
+
+          const container = document.getElementById('camposEdicaoServico');
+          const tipo = registro.tipo;
+          let html = `<label>Tipo</label><input type="text" class="form-control mb-2" value="${tipo}" disabled>`;
+
+          // Switch para campos de edição (mantido, mas limpo)
+          switch (tipo) {
+            case 'lavanderia':
+              html += `
+                <label>Data:</label><input type="date" class="form-control mb-2" id="edit-data" value="${registro.data || ''}">
+                <label>Lavagens:</label><input type="number" class="form-control mb-2" id="edit-qtdLavagens" value="${registro.qtdlavagens || 0}">
+                <label>Secagens:</label><input type="number" class="form-control mb-2" id="edit-qtdSecagens" value="${registro.qtdsecagens || 0}">
+              `;
+              break;
+            // ... outros casos
+          }
+          container.innerHTML = html;
+
+          // Para refeições, adicionar dias
+          if (tipo === 'refeicoes' && Array.isArray(registro.dias)) {
+            const diasContainer = document.getElementById('edit-refeicoesDias');
+            registro.dias.forEach(dia => {
+              const linha = document.createElement('div');
+              linha.classList.add('mb-2', 'edit-linha-dia');
+              linha.innerHTML = `
+                <div class="d-flex align-items-center">
+                  <input type="date" class="form-control me-2 edit-data-refeicao" value="${dia.data}">
+                  <input type="number" class="form-control edit-qtd-refeicao" min="1" value="${dia.qtd}">
+                  <button type="button" class="btn btn-danger btn-sm ms-2" onclick="this.parentElement.parentElement.remove()">X</button>
+                </div>
+              `;
+              diasContainer.appendChild(linha);
+            });
+          }
+
+          const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('modalEditarRegistro'));
+          modal.show();
+        }
+
+        async function salvarEdicao() {
+          const id = document.getElementById('edit-id').value;
+          const tipo = registroEditando.tipo;
+          let payload = {};
+
+          // Lógica de payload por tipo (abreviada)
+          switch (tipo) {
+            case 'lavanderia':
+              payload = {
+                data: document.getElementById('edit-data').value,
+                qtdlavagens: Number(document.getElementById('edit-qtdLavagens').value),
+                qtdsecagens: Number(document.getElementById('edit-qtdSecagens').value)
+              };
+              break;
+            // ... outros
+          }
+
+          if (!payload.data) return alert('Preencha a data.');
+          const { error } = await supabase.from('registros').update(payload).eq('id', id);
+          if (error) return alert('Erro: ' + error.message);
+
+          bootstrap.Modal.getInstance(document.getElementById('modalEditarRegistro')).hide();
+          alert('Atualizado!');
           carregarListaRegistros();
         }
-      }
 
-      document.getElementById('formUso').addEventListener('submit', (e) => {
-        e.preventDefault();
-        prepararRegistro();
-      });
-
-      function gerarDescricaoDetalhada(reg) {
-        // Mantido como no original, mas com switch limpo
-        switch (reg.tipo?.toLowerCase()) {
-          case 'lavanderia':
-            return `Lavagens: ${reg.qtdlavagens || 0}, Secagens: ${reg.qtdsecagens || 0}`;
-          // ... outros casos
-          default:
-            return reg.descricao || '-';
-        }
-      }
-
-      async function carregarListaRegistros(limite = 5, verTodos = false) {
-        // Lógica mantida, mas com try/catch melhorado
-        try {
-          const { data: userData } = await supabase.auth.getUser();
-          const user = userData?.user;
+        async function aplicarFiltro() {
+          const dataInicio = document.getElementById('filtroDataInicio').value;
+          const dataFim = document.getElementById('filtroDataFim').value;
+          const usuarioFiltro = document.getElementById('filtroUsuario')?.value?.trim();
           const usuarioLogado = JSON.parse(localStorage.getItem('usuarioLogado'));
 
-          // Verificar total de registros
-          let queryTotal = supabase.from('registros').select('*', { count: 'exact' });
-          if (usuarioLogado?.tipo === 'comum' && user) queryTotal = queryTotal.eq('user_id', user.id);
-          const { count: total } = await queryTotal;
-          if (total === 0) {
-            document.getElementById('listaRegistros').innerHTML = '<tr><td colspan="5" class="text-center text-muted">Nenhum registro encontrado.</td></tr>';
-            return;
-          }
-
-          // Consulta principal
           let query = supabase.from('registros').select('*').order('data', { ascending: false });
-          const hoje = new Date();
-          const primeiroDia = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0];
-          const ultimoDia = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).toISOString().split('T')[0];
-          query = query.gte('data', primeiroDia).lte('data', ultimoDia);
-          if (usuarioLogado?.tipo === 'comum' && user) query = query.eq('user_id', user.id);
-          if (!verTodos && limite > 0) query = query.limit(limite);
+          if (dataInicio) query = query.gte('data', dataInicio);
+          if (dataFim) query = query.lte('data', dataFim);
+          if (usuarioLogado.tipo === 'comum') query = query.eq('user_id', usuarioLogado.id);
+          else if (usuarioLogado.tipo === 'admin' && usuarioFiltro) query = query.ilike('nome', `%${usuarioFiltro}%`);
 
           const { data, error } = await query;
-          if (error) throw error;
+          if (error) return alert('Erro: ' + error.message);
 
           listaCache = data || [];
-          if (!listaCache.length) {
-            document.getElementById('listaRegistros').innerHTML = '<tr><td colspan="5" class="text-center text-muted">Nenhum registro no mês atual.</td></tr>';
-            return;
-          }
-
           const tbody = document.getElementById('listaRegistros');
-          tbody.innerHTML = listaCache.map(reg => `
+          tbody.innerHTML = listaCache.length ? listaCache.map(reg => `
             <tr>
               <td>${new Date(reg.data + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
-              <td>${reg.nome || reg.user_id || ''}</td>
+              <td>${reg.usuarios?.nome || reg.nome || ''}</td>
               <td>${reg.tipo || ''}</td>
               <td>${gerarDescricaoDetalhada(reg)}</td>
               <td>
@@ -672,345 +815,214 @@
                 <button class="btn btn-sm btn-danger" onclick="excluirRegistroSupabase('${reg.id}')">Excluir</button>
               </td>
             </tr>
-          `).join('');
-
-          // Botões Ver Todos/Recolher
-          document.getElementById('btnVerTodos').classList.toggle('hidden', verTodos);
-          document.getElementById('btnRecolher').classList.toggle('hidden', !verTodos);
-
-          // Info do período
-          const periodoInfo = document.getElementById('periodoInfo');
-          if (periodoInfo) {
-            const mes = hoje.toLocaleString('pt-BR', { month: 'long' });
-            periodoInfo.textContent = verTodos ? `Todos de ${mes}` : `Últimos ${limite} de ${mes}`;
-            periodoInfo.classList.remove('hidden');
-          }
-        } catch (err) {
-          console.error('Erro ao carregar registros:', err);
-          document.getElementById('listaRegistros').innerHTML = `<tr><td colspan="5" class="text-danger">Erro: ${err.message}</td></tr>`;
+          `).join('') : '<tr><td colspan="5" class="text-center text-muted">Nenhum encontrado.</td></tr>';
         }
-      }
 
-      // Event listeners para botões
-      document.getElementById('btnVerTodos').addEventListener('click', () => carregarListaRegistros(null, true));
-      document.getElementById('btnRecolher').addEventListener('click', () => carregarListaRegistros(5, false));
+        // ========== RELATÓRIOS ==========
+        async function gerarRelatorio() {
+          // Lógica mantida, mas limpa
+          const dataInicial = document.getElementById('dataInicial').value;
+          const dataFinal = document.getElementById('dataFinal').value;
+          const inicio = dataInicial ? new Date(dataInicial) : null;
+          const fim = dataFinal ? new Date(dataFinal) : null;
 
-      async function excluirRegistroSupabase(id) {
-        if (!confirm('Excluir registro?')) return;
-        const { error } = await supabase.from('registros').delete().eq('id', id);
-        if (error) {
-          alert('Erro: ' + error.message);
-        } else {
-          alert('Excluído!');
-          carregarListaRegistros();
-        }
-      }
+          const { data: registros, error } = await supabase.from('registros').select('*');
+          if (error) return document.getElementById('relatorio').textContent = 'Erro ao buscar registros.';
 
-      async function editarRegistro(id) {
-        const registro = listaCache.find(r => r.id == id);
-        if (!registro) return alert('Registro não encontrado.');
-        registroEditando = registro;
-        document.getElementById('edit-id').value = registro.id;
+          if (!registros?.length) return document.getElementById('relatorio').textContent = 'Nenhum registro encontrado.';
 
-        const container = document.getElementById('camposEdicaoServico');
-        const tipo = registro.tipo;
-        let html = `<label>Tipo</label><input type="text" class="form-control mb-2" value="${tipo}" disabled>`;
-
-        // Switch para campos de edição (mantido, mas limpo)
-        switch (tipo) {
-          case 'lavanderia':
-            html += `
-              <label>Data:</label><input type="date" class="form-control mb-2" id="edit-data" value="${registro.data || ''}">
-              <label>Lavagens:</label><input type="number" class="form-control mb-2" id="edit-qtdLavagens" value="${registro.qtdlavagens || 0}">
-              <label>Secagens:</label><input type="number" class="form-control mb-2" id="edit-qtdSecagens" value="${registro.qtdsecagens || 0}">
-            `;
-            break;
-          // ... outros casos
-        }
-        container.innerHTML = html;
-
-        // Para refeições, adicionar dias
-        if (tipo === 'refeicoes' && Array.isArray(registro.dias)) {
-          const diasContainer = document.getElementById('edit-refeicoesDias');
-          registro.dias.forEach(dia => {
-            const linha = document.createElement('div');
-            linha.classList.add('mb-2', 'edit-linha-dia');
-            linha.innerHTML = `
-              <div class="d-flex align-items-center">
-                <input type="date" class="form-control me-2 edit-data-refeicao" value="${dia.data}">
-                <input type="number" class="form-control edit-qtd-refeicao" min="1" value="${dia.qtd}">
-                <button type="button" class="btn btn-danger btn-sm ms-2" onclick="this.parentElement.parentElement.remove()">X</button>
-              </div>
-            `;
-            diasContainer.appendChild(linha);
+          const resumo = {};
+          registros.forEach(reg => {
+            const nome = reg.nome || reg.user_id;
+            if (!resumo[nome]) resumo[nome] = { lavanderia: 0, secagens: 0, /* ... outros */ };
+            // Lógica de resumo por tipo
           });
+
+          let texto = '';
+          for (const nome in resumo) {
+            const r = resumo[nome];
+            texto += `Usuário: ${nome}\n`;
+            if (r.lavanderia) texto += `- Lavanderia: ${r.lavanderia} lavagem(ns)\n`;
+            // ... outros
+            texto += '\n';
+          }
+          document.getElementById('relatorio').textContent = texto;
         }
 
-        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('modalEditarRegistro'));
-        modal.show();
-      }
-
-      async function salvarEdicao() {
-        const id = document.getElementById('edit-id').value;
-        const tipo = registroEditando.tipo;
-        let payload = {};
-
-        // Lógica de payload por tipo (abreviada)
-        switch (tipo) {
-          case 'lavanderia':
-            payload = {
-              data: document.getElementById('edit-data').value,
-              qtdlavagens: Number(document.getElementById('edit-qtdLavagens').value),
-              qtdsecagens: Number(document.getElementById('edit-qtdSecagens').value)
-            };
-            break;
-          // ... outros
+        function baixarRelatorioPDF() {
+          // Lógica mantida
+          const texto = document.getElementById('relatorio').textContent.trim();
+          if (!texto) return alert('Gere o relatório primeiro.');
+          // ... (PDF generation code)
         }
 
-        if (!payload.data) return alert('Preencha a data.');
-        const { error } = await supabase.from('registros').update(payload).eq('id', id);
-        if (error) return alert('Erro: ' + error.message);
-
-        bootstrap.Modal.getInstance(document.getElementById('modalEditarRegistro')).hide();
-        alert('Atualizado!');
-        carregarListaRegistros();
-      }
-
-      async function aplicarFiltro() {
-        const dataInicio = document.getElementById('filtroDataInicio').value;
-        const dataFim = document.getElementById('filtroDataFim').value;
-        const usuarioFiltro = document.getElementById('filtroUsuario')?.value?.trim();
-        const usuarioLogado = JSON.parse(localStorage.getItem('usuarioLogado'));
-
-        let query = supabase.from('registros').select('*').order('data', { ascending: false });
-        if (dataInicio) query = query.gte('data', dataInicio);
-        if (dataFim) query = query.lte('data', dataFim);
-        if (usuarioLogado.tipo === 'comum') query = query.eq('user_id', usuarioLogado.id);
-        else if (usuarioLogado.tipo === 'admin' && usuarioFiltro) query = query.ilike('nome', `%${usuarioFiltro}%`);
-
-        const { data, error } = await query;
-        if (error) return alert('Erro: ' + error.message);
-
-        listaCache = data || [];
-        const tbody = document.getElementById('listaRegistros');
-        tbody.innerHTML = listaCache.length ? listaCache.map(reg => `
-          <tr>
-            <td>${new Date(reg.data + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
-            <td>${reg.usuarios?.nome || reg.nome || ''}</td>
-            <td>${reg.tipo || ''}</td>
-            <td>${gerarDescricaoDetalhada(reg)}</td>
-            <td>
-              <button class="btn btn-sm btn-warning me-1" onclick="editarRegistro('${reg.id}')">Editar</button>
-              <button class="btn btn-sm btn-danger" onclick="excluirRegistroSupabase('${reg.id}')">Excluir</button>
-            </td>
-          </tr>
-        `).join('') : '<tr><td colspan="5" class="text-center text-muted">Nenhum encontrado.</td></tr>';
-      }
-
-      // ========== RELATÓRIOS ==========
-      async function gerarRelatorio() {
-        // Lógica mantida, mas limpa
-        const dataInicial = document.getElementById('dataInicial').value;
-        const dataFinal = document.getElementById('dataFinal').value;
-        const inicio = dataInicial ? new Date(dataInicial) : null;
-        const fim = dataFinal ? new Date(dataFinal) : null;
-
-        const { data: registros, error } = await supabase.from('registros').select('*');
-        if (error) return document.getElementById('relatorio').textContent = 'Erro ao buscar registros.';
-
-        if (!registros?.length) return document.getElementById('relatorio').textContent = 'Nenhum registro encontrado.';
-
-        const resumo = {};
-        registros.forEach(reg => {
-          const nome = reg.nome || reg.user_id;
-          if (!resumo[nome]) resumo[nome] = { lavanderia: 0, secagens: 0, /* ... outros */ };
-          // Lógica de resumo por tipo
-        });
-
-        let texto = '';
-        for (const nome in resumo) {
-          const r = resumo[nome];
-          texto += `Usuário: ${nome}\n`;
-          if (r.lavanderia) texto += `- Lavanderia: ${r.lavanderia} lavagem(ns)\n`;
-          // ... outros
-          texto += '\n';
+        function baixarRelatorioExcel() {
+          // Lógica mantida
+          // ... (Excel generation code)
         }
-        document.getElementById('relatorio').textContent = texto;
-      }
 
-      function baixarRelatorioPDF() {
-        // Lógica mantida
-        const texto = document.getElementById('relatorio').textContent.trim();
-        if (!texto) return alert('Gere o relatório primeiro.');
-        // ... (PDF generation code)
-      }
+        async function gerarRelatorioRefeicoesPeriodo() {
+          // Lógica mantida
+          const dataInicial = document.getElementById('dataRefInicio').value;
+          const dataFinal = document.getElementById('dataRefFim').value;
+          if (!dataInicial || !dataFinal) return alert('Selecione o período.');
 
-      function baixarRelatorioExcel() {
-        // Lógica mantida
-        // ... (Excel generation code)
-      }
+          const inicio = new Date(dataInicial);
+          const fim = new Date(dataFinal);
+          fim.setHours(23, 59, 59, 999);
 
-      async function gerarRelatorioRefeicoesPeriodo() {
-        // Lógica mantida
-        const dataInicial = document.getElementById('dataRefInicio').value;
-        const dataFinal = document.getElementById('dataRefFim').value;
-        if (!dataInicial || !dataFinal) return alert('Selecione o período.');
+          const { data: registros, error } = await supabase.from('registros').select('dias, nome, user_id').eq('tipo', 'refeicoes');
+          if (error) return alert('Erro ao carregar.');
 
-        const inicio = new Date(dataInicial);
-        const fim = new Date(dataFinal);
-        fim.setHours(23, 59, 59, 999);
+          const resumo = {};
+          const pessoasPorDia = {};
+          registros.forEach(reg => {
+            if (Array.isArray(reg.dias)) {
+              reg.dias.forEach(dia => {
+                const data = new Date(dia.data);
+                if (data >= inicio && data <= fim) {
+                  const diaStr = data.toISOString().split('T')[0];
+                  resumo[diaStr] = (resumo[diaStr] || 0) + (dia.qtd || 0);
+                  if (!pessoasPorDia[diaStr]) pessoasPorDia[diaStr] = [];
+                  pessoasPorDia[diaStr].push(reg.nome || reg.user_id || 'Sem nome');
+                }
+              });
+            }
+          });
 
-        const { data: registros, error } = await supabase.from('registros').select('dias, nome, user_id').eq('tipo', 'refeicoes');
-        if (error) return alert('Erro ao carregar.');
-
-        const resumo = {};
-        const pessoasPorDia = {};
-        registros.forEach(reg => {
-          if (Array.isArray(reg.dias)) {
-            reg.dias.forEach(dia => {
-              const data = new Date(dia.data);
-              if (data >= inicio && data <= fim) {
-                const diaStr = data.toISOString().split('T')[0];
-                resumo[diaStr] = (resumo[diaStr] || 0) + (dia.qtd || 0);
-                if (!pessoasPorDia[diaStr]) pessoasPorDia[diaStr] = [];
-                pessoasPorDia[diaStr].push(reg.nome || reg.user_id || 'Sem nome');
-              }
+          let texto = `Refeições de ${formatDateISOtoBR(dataInicial)} a ${formatDateISOtoBR(dataFinal)}:\n\n`;
+          if (!Object.keys(resumo).length) texto += 'Nenhum agendamento.';
+          else {
+            Object.keys(resumo).sort().forEach(dia => {
+              texto += `${formatDateISOtoBR(dia)}: ${resumo[dia]} refeições\n`;
             });
           }
-        });
+          document.getElementById('relatorioRefeicoesPeriodo').textContent = texto;
 
-        let texto = `Refeições de ${formatDateISOtoBR(dataInicial)} a ${formatDateISOtoBR(dataFinal)}:\n\n`;
-        if (!Object.keys(resumo).length) texto += 'Nenhum agendamento.';
-        else {
-          Object.keys(resumo).sort().forEach(dia => {
-            texto += `${formatDateISOtoBR(dia)}: ${resumo[dia]} refeições\n`;
-          });
+          const link = `https://wa.me/?text=${encodeURIComponent(texto)}`;
+          document.getElementById('whatsappLinkRefeicoes').href = link;
+          document.getElementById('whatsappLinkRefeicoes').style.display = 'inline-block';
+
+          window._relatorioNomesRefeicoes = pessoasPorDia;
+          const btnModal = document.getElementById('btnModalNomesRefeicoes');
+          btnModal.style.display = 'inline-block';
+          btnModal.onclick = () => {
+            const pessoas = window._relatorioNomesRefeicoes || {};
+            const dias = Object.keys(pessoas).sort();
+            let html = dias.length ? `<table class="table table-bordered table-sm"><thead><tr><th>Data</th><th>Nomes</th></tr></thead><tbody>` +
+              dias.map(dia => `<tr><td>${formatDateISOtoBR(dia)}</td><td>${pessoas[dia].filter(Boolean).join(', ') || 'Sem nomes'}</td></tr>`).join('') +
+              '</tbody></table>' : '<div class="text-muted text-center">Nenhum agendamento.</div>';
+            document.getElementById('modalNomesRefeicoesBody').innerHTML = html;
+            const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('modalNomesRefeicoes'));
+            modal.show();
+          };
         }
-        document.getElementById('relatorioRefeicoesPeriodo').textContent = texto;
 
-        const link = `https://wa.me/?text=${encodeURIComponent(texto)}`;
-        document.getElementById('whatsappLinkRefeicoes').href = link;
-        document.getElementById('whatsappLinkRefeicoes').style.display = 'inline-block';
+        // ========== GERENCIAMENTO DE USUÁRIOS ==========
+        async function abrirModalUsuarios() {
+          const lista = document.getElementById('listaUsuariosModal');
+          lista.innerHTML = '<li class="list-group-item text-center text-muted">Carregando...</li>';
+          const { data: { session }, error } = await supabase.auth.getSession();
+          if (error || !session) return lista.innerHTML = '<li class="text-danger">Não autenticado.</li>';
 
-        window._relatorioNomesRefeicoes = pessoasPorDia;
-        const btnModal = document.getElementById('btnModalNomesRefeicoes');
-        btnModal.style.display = 'inline-block';
-        btnModal.onclick = () => {
-          const pessoas = window._relatorioNomesRefeicoes || {};
-          const dias = Object.keys(pessoas).sort();
-          let html = dias.length ? `<table class="table table-bordered table-sm"><thead><tr><th>Data</th><th>Nomes</th></tr></thead><tbody>` +
-            dias.map(dia => `<tr><td>${formatDateISOtoBR(dia)}</td><td>${pessoas[dia].filter(Boolean).join(', ') || 'Sem nomes'}</td></tr>`).join('') +
-            '</tbody></table>' : '<div class="text-muted text-center">Nenhum agendamento.</div>';
-          document.getElementById('modalNomesRefeicoesBody').innerHTML = html;
-          const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('modalNomesRefeicoes'));
-          modal.show();
-        };
-      }
+          const token = session.access_token;
+          const usuarioAtual = session.user;
+          try {
+            const res = await fetch('https://xqwubmknwvvonjzaecmk.functions.supabase.co/listar-usuarios-seguro', {
+              method: 'GET',
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!res.ok) return lista.innerHTML = `<li class="text-danger">Erro: ${await res.text()}</li>`;
 
-      // ========== GERENCIAMENTO DE USUÁRIOS ==========
-      async function abrirModalUsuarios() {
-        const lista = document.getElementById('listaUsuariosModal');
-        lista.innerHTML = '<li class="list-group-item text-center text-muted">Carregando...</li>';
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (error || !session) return lista.innerHTML = '<li class="text-danger">Não autenticado.</li>';
+            const { usuarios } = await res.json();
+            if (!usuarios?.length) return lista.innerHTML = '<li class="text-center text-muted">Nenhum usuário.</li>';
 
-        const token = session.access_token;
-        const usuarioAtual = session.user;
-        try {
-          const res = await fetch('https://xqwubmknwvvonjzaecmk.functions.supabase.co/listar-usuarios-seguro', {
-            method: 'GET',
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          if (!res.ok) return lista.innerHTML = `<li class="text-danger">Erro: ${await res.text()}</li>`;
-
-          const { usuarios } = await res.json();
-          if (!usuarios?.length) return lista.innerHTML = '<li class="text-center text-muted">Nenhum usuário.</li>';
-
-          lista.innerHTML = '';
-          usuarios.forEach(u => {
-            if (u.user_id === usuarioAtual.id) return;
-            const li = document.createElement('li');
-            li.className = 'list-group-item d-flex flex-column align-items-start';
-            li.innerHTML = `
-              <div class="d-flex justify-content-between w-100">
-                <div><strong>${u.nome || '(sem nome)'}</strong><br><small>${u.email || u.user_id}</small><br><small class="text-muted">${u.tipo || 'desconhecido'}</small></div>
-                <div class="d-flex flex-column align-items-end gap-1">
-                  ${u.tipo !== 'admin' ? `
-                    <button class="btn btn-sm ${u.liberado_relatorio_geral ? 'btn-success' : 'btn-secondary'}" onclick="alterarPermissao('${u.user_id}', 'liberado_relatorio_geral', ${!u.liberado_relatorio_geral})">Relatório Geral</button>
-                    <button class="btn btn-sm ${u.liberado_relatorio_refeicoes ? 'btn-success' : 'btn-secondary'}" onclick="alterarPermissao('${u.user_id}', 'liberado_relatorio_refeicoes', ${!u.liberado_relatorio_refeicoes})">Relatório Refeições</button>
-                  ` : ''}
-                  <button class="btn btn-sm btn-danger" onclick="excluirUsuario('${u.user_id}')">Excluir</button>
+            lista.innerHTML = '';
+            usuarios.forEach(u => {
+              if (u.user_id === usuarioAtual.id) return;
+              const li = document.createElement('li');
+              li.className = 'list-group-item d-flex flex-column align-items-start';
+              li.innerHTML = `
+                <div class="d-flex justify-content-between w-100">
+                  <div><strong>${u.nome || '(sem nome)'}</strong><br><small>${u.email || u.user_id}</small><br><small class="text-muted">${u.tipo || 'desconhecido'}</small></div>
+                  <div class="d-flex flex-column align-items-end gap-1">
+                    ${u.tipo !== 'admin' ? `
+                      <button class="btn btn-sm ${u.liberado_relatorio_geral ? 'btn-success' : 'btn-secondary'}" onclick="alterarPermissao('${u.user_id}', 'liberado_relatorio_geral', ${!u.liberado_relatorio_geral})">Relatório Geral</button>
+                      <button class="btn btn-sm ${u.liberado_relatorio_refeicoes ? 'btn-success' : 'btn-secondary'}" onclick="alterarPermissao('${u.user_id}', 'liberado_relatorio_refeicoes', ${!u.liberado_relatorio_refeicoes})">Relatório Refeições</button>
+                    ` : ''}
+                    <button class="btn btn-sm btn-danger" onclick="excluirUsuario('${u.user_id}')">Excluir</button>
+                  </div>
                 </div>
-              </div>
-            `;
-            lista.appendChild(li);
+              `;
+              lista.appendChild(li);
+            });
+          } catch (err) {
+            lista.innerHTML = `<li class="text-danger">Erro: ${err.message}</li>`;
+          }
+          const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('modalListaUsuarios'));
+          modal.show();
+        }
+
+        async function excluirUsuario(user_id) {
+          if (!confirm('Excluir usuário?')) return;
+          const { data: { session }, error } = await supabase.auth.getSession();
+          if (error || !session) return alert('Não autenticado.');
+
+          const res = await fetch('https://xqwubmknwvvonjzaecmk.functions.supabase.co/excluir-usuario-ts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+            body: JSON.stringify({ user_id })
           });
-        } catch (err) {
-          lista.innerHTML = `<li class="text-danger">Erro: ${err.message}</li>`;
+          if (!res.ok) return alert('Erro: ' + await res.text());
+          alert('Excluído!');
+          if (typeof carregarListaUsuarios === 'function') carregarListaUsuarios();
         }
-        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('modalListaUsuarios'));
-        modal.show();
-      }
 
-      async function excluirUsuario(user_id) {
-        if (!confirm('Excluir usuário?')) return;
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (error || !session) return alert('Não autenticado.');
+        async function alterarPermissao(user_id, permissao, valor) {
+          const { data: { session }, error } = await supabase.auth.getSession();
+          if (error || !session) return alert('Não autenticado.');
 
-        const res = await fetch('https://xqwubmknwvvonjzaecmk.functions.supabase.co/excluir-usuario-ts', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-          body: JSON.stringify({ user_id })
-        });
-        if (!res.ok) return alert('Erro: ' + await res.text());
-        alert('Excluído!');
-        if (typeof carregarListaUsuarios === 'function') carregarListaUsuarios();
-      }
-
-      async function alterarPermissao(user_id, permissao, valor) {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (error || !session) return alert('Não autenticado.');
-
-        const response = await fetch('https://xqwubmknwvvonjzaecmk.functions.supabase.co/alterar-permissao-usuario', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-          body: JSON.stringify({ user_id, permissao, valor: Boolean(valor) })
-        });
-        if (!response.ok) return alert('Erro: ' + await response.text());
-        alert('Permissão alterada!');
-        if (typeof carregarListaUsuarios === 'function') carregarListaUsuarios();
-      }
-
-      document.getElementById('formMissionario').addEventListener('submit', async function (e) {
-        e.preventDefault();
-        const nome = document.getElementById('nomeMissionario').value.trim();
-        const email = document.getElementById('emailMissionario').value.trim();
-        const senha = document.getElementById('senhaMissionario').value;
-        const tipo = document.getElementById('tipoUsuario').value;
-        if (!nome || !email || !senha || !tipo) return alert('Preencha todos os campos.');
-
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (!session) return alert('Não autenticado.');
-
-        const response = await fetch('https://xqwubmknwvvonjzaecmk.functions.supabase.co/criar-usuario-ts', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-          body: JSON.stringify({ nome, email, senha, tipo })
-        });
-        if (!response.ok) return alert('Erro: ' + await response.text());
-        alert('Cadastrado!');
-        this.reset();
-      });
-
-      // ========== INICIALIZAÇÃO ==========
-      supabase.auth.onAuthStateChange((event, session) => {
-        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-          verificarLogin();
-          carregarListaRegistros();
-        } else if (event === 'SIGNED_OUT') {
-          document.getElementById('listaRegistros').innerHTML = '<tr><td colspan="4" class="text-center text-muted">Faça login.</td></tr>';
+          const response = await fetch('https://xqwubmknwvvonjzaecmk.functions.supabase.co/alterar-permissao-usuario', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+            body: JSON.stringify({ user_id, permissao, valor: Boolean(valor) })
+          });
+          if (!response.ok) return alert('Erro: ' + await response.text());
+          alert('Permissão alterada!');
+          if (typeof carregarListaUsuarios === 'function') carregarListaUsuarios();
         }
-      });
+
+        document.getElementById('formMissionario').addEventListener('submit', async function (e) {
+          e.preventDefault();
+          const nome = document.getElementById('nomeMissionario').value.trim();
+          const email = document.getElementById('emailMissionario').value.trim();
+          const senha = document.getElementById('senhaMissionario').value;
+          const tipo = document.getElementById('tipoUsuario').value;
+          if (!nome || !email || !senha || !tipo) return alert('Preencha todos os campos.');
+
+          const { data: { session }, error } = await supabase.auth.getSession();
+          if (!session) return alert('Não autenticado.');
+
+          const response = await fetch('https://xqwubmknwvvonjzaecmk.functions.supabase.co/criar-usuario-ts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+            body: JSON.stringify({ nome, email, senha, tipo })
+          });
+          if (!response.ok) return alert('Erro: ' + await response.text());
+          alert('Cadastrado!');
+          this.reset();
+        });
+
+        // ========== INICIALIZAÇÃO ==========
+        supabase.auth.onAuthStateChange((event, session) => {
+          if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+            verificarLogin();
+            carregarListaRegistros();
+          } else if (event === 'SIGNED_OUT') {
+            document.getElementById('listaRegistros').innerHTML = '<tr><td colspan="4" class="text-center text-muted">Faça login.</td></tr>';
+          }
+        });
+      } // Fecha o bloco if (!window.appInitialized)
     </script>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
