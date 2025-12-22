@@ -255,9 +255,7 @@
   </div>
 </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    
-    
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>   
     <script>
       let listaCache = [];
       let registroEditando = null;
@@ -288,8 +286,6 @@
         'https://xqwubmknwvvonjzaecmk.supabase.co',
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhxd3VibWtud3Z2b25qemFlY21rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQwODY2OTQsImV4cCI6MjA2OTY2MjY5NH0._42N0mZO4NcLPcCG9YMB0_hkMTLF5tCdlPZYagN3vIk'
       );
-
-      // ...existing code...
 
 async function verificarLogin() {
   try {
@@ -1353,7 +1349,6 @@ function baixarRelatorioPDF() {
   const texto = document.getElementById('relatorio').textContent.trim();
   const dataInicial = document.getElementById('dataInicial').value;
   const dataFinal = document.getElementById('dataFinal').value;
-
   if (!dataInicial || !dataFinal) {
     alert('Selecione o período antes de exportar.');
     return;
