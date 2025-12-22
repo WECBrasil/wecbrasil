@@ -254,7 +254,8 @@
     <p>Gerencie permissões e exclusão de usuários cadastrados.</p>
   </div>
 </div>
-    
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
       let listaCache = [];
       let registroEditando = null;
@@ -1815,8 +1816,7 @@ document.getElementById('btnEsqueceuSenha')?.addEventListener('click', async fun
   alert('Se este email estiver cadastrado, você receberá instruções para redefinir sua senha.');
 });
     </script>
-
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
   <script>
   (function () {
   const btn = document.getElementById('btnVoltarMeusAplicativos');
