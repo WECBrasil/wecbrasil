@@ -190,7 +190,7 @@
           <div class="user-name" id="usuarioNome">Carregando...</div>
           <div class="user-role" id="usuarioTipo">Administrador</div>
         </div>
-        <button class="btn-logout" onclick="logout()">Sair</button>
+        <button class="btn-logout">Sair</button>
       </div>
     </div>
 
@@ -229,7 +229,7 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     const { createClient } = window.supabase;
-    const supabase = createClient(
+    const supabaseClient = createClient(
       'https://xqwubmknwvvonjzaecmk.supabase.co',
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhxd3VibWtud3Z2b25qemFlY21rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQwODY2OTQsImV4cCI6MjA2OTY2MjY5NH0._42N0mZO4NcLPcCG9YMB0_hkMTLF5tCdlPZYagN3vIk'
     );
@@ -237,7 +237,7 @@
     // Logout mínimo (evita erro "logout is not defined")
     async function logout() {
       try {
-        await supabase.auth.signOut();
+        await supabaseClient.auth.signOut();
       } catch (err) {
         console.error('Erro ao deslogar:', err);
       } finally {
@@ -249,12 +249,17 @@
 
     // inicializa após DOM pronto — evita acionar elementos que ainda não existem
     document.addEventListener('DOMContentLoaded', () => {
+      // Adicionar event listener para o botão logout
+      const btnLogout = document.querySelector('.btn-logout');
+      if (btnLogout) {
+        btnLogout.addEventListener('click', logout);
+      }
       (async function initAdminPage() {
         try {
-          const { data: { user }, error: userError } = await supabase.auth.getUser();
+          const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
           if (userError || !user) return window.location.href = './index.html';
 
-          const { data: perfil, error: perfilError } = await supabase
+          const { data: perfil, error: perfilError } = await supabaseClient
             .from('usuarios')
             .select('tipo, nome')
             .eq('user_id', user.id)
