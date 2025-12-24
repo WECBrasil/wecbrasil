@@ -282,14 +282,14 @@
       }
 
       const { createClient } = window.supabase;
-      const supabase = createClient(
+      const supabaseClient = createClient(
         'https://xqwubmknwvvonjzaecmk.supabase.co',
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhxd3VibWtud3Z2b25qemFlY21rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQwODY2OTQsImV4cCI6MjA2OTY2MjY5NH0._42N0mZO4NcLPcCG9YMB0_hkMTLF5tCdlPZYagN3vIk'
       );
 
 async function verificarLogin() {
   try {
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
     if (userError || !user) {
       document.getElementById('loginCard').classList.remove('hidden');
       document.getElementById('registroCard')?.classList.add('hidden');
@@ -297,7 +297,7 @@ async function verificarLogin() {
       return;
     }
 
-    const { data: perfil, error: perfilError } = await supabase
+    const { data: perfil, error: perfilError } = await supabaseClient
       .from('usuarios')
       .select('tipo, nome, liberado_relatorio_geral, liberado_relatorio_refeicoes')
       .eq('user_id', user.id)
@@ -305,7 +305,7 @@ async function verificarLogin() {
 
     if (perfilError || !perfil) {
       console.error('Erro ao carregar perfil:', perfilError);
-      await supabase.auth.signOut();
+      await supabaseClient.auth.signOut();
       return location.reload();
     }
 
@@ -372,7 +372,7 @@ async function verificarLogin() {
         const email = document.getElementById('loginUsuario').value;
         const senha = document.getElementById('loginSenha').value;
 
-        const { data, error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabaseClient.auth.signInWithPassword({
           email,
           password: senha
         });
@@ -406,7 +406,7 @@ async function verificarLogin() {
           return;
         }
 
-        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        const { data: signUpData, error: signUpError } = await supabaseClient.auth.signUp({
           email,
           password: senha,
           options: {
@@ -429,7 +429,7 @@ async function verificarLogin() {
           return;
         }
 
-        const { data: existingUser, error: fetchError } = await supabase
+        const { data: existingUser, error: fetchError } = await supabaseClient
           .from('usuarios')
           .select('user_id')
           .eq('user_id', userId)
@@ -441,7 +441,7 @@ async function verificarLogin() {
         }
 
         if (!existingUser) {
-          const { error: insertError } = await supabase
+          const { error: insertError } = await supabaseClient
             .from('usuarios')
             .insert([{ user_id: userId, nome, tipo: 'comum', email }]);
 
@@ -457,7 +457,7 @@ async function verificarLogin() {
       });
 
       async function logout() {
-        await supabase.auth.signOut();
+        await supabaseClient.auth.signOut();
         localStorage.removeItem('usuarioLogado');
         location.reload();
       }
@@ -472,7 +472,7 @@ async function verificarLogin() {
         const senhaAtual = document.getElementById('senhaAtual').value;
         const novaSenha = document.getElementById('novaSenha').value;
         const usuario = JSON.parse(localStorage.getItem('usuarioLogado'));
-        const { data: authData, error: loginError } = await supabase.auth.signInWithPassword({
+        const { data: authData, error: loginError } = await supabaseClient.auth.signInWithPassword({
           email: usuario.email,
           password: senhaAtual,
         });
@@ -482,7 +482,7 @@ async function verificarLogin() {
           return;
         }
 
-        const { error: updateError } = await supabase.auth.updateUser({
+        const { error: updateError } = await supabaseClient.auth.updateUser({
           password: novaSenha,
         });
 
@@ -601,7 +601,7 @@ async function verificarLogin() {
       }
 
       async function prepararRegistro() {
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
         if (userError || !user) {
           alert('Usuário não autenticado');
           return;
@@ -692,7 +692,7 @@ async function verificarLogin() {
           registro.saida = saida;
         }
 
-        const { error } = await supabase.from('registros').insert([registro]);
+        const { error } = await supabaseClient.from('registros').insert([registro]);
         if (error) {
           console.error('Erro ao salvar registro:', error);
           alert('Erro ao salvar registro. Verifique os dados e tente novamente.');
@@ -770,13 +770,13 @@ async function verificarLogin() {
 
             async function carregarListaRegistros(limite = 5, verTodos = false) {
               try {
-                const { data: userData, error: userError } = await supabase.auth.getUser();
+                const { data: userData, error: userError } = await supabaseClient.auth.getUser();
                 if (userError) throw userError;
                 const user = userData?.user || null;
                 const usuarioLogado = JSON.parse(localStorage.getItem('usuarioLogado'));
             
                 // Primeiro, vamos verificar se o usuário tem algum registro
-                let queryTotal = supabase
+                let queryTotal = supabaseClient
                   .from('registros')
                   .select('*', { count: 'exact' });
             
@@ -797,7 +797,7 @@ async function verificarLogin() {
                 }
             
                 // Consulta para o mês atual
-                let query = supabase
+                let query = supabaseClient
                   .from('registros')
                   .select('*')
                   .order('data', { ascending: false });
@@ -894,7 +894,7 @@ async function verificarLogin() {
       async function excluirRegistroSupabase(id) {
         if (!confirm('Tem certeza que deseja excluir este registro?')) return;
 
-        const { error } = await supabase
+        const { error } = await supabaseClient
           .from('registros')
           .delete()
           .eq('id', id);
@@ -1105,7 +1105,7 @@ function adicionarDiaRefeicaoEdicao() {
     return;
   }
 
-  const { error } = await supabase
+  const { error } = await supabaseClient
     .from('registros')
     .update(payload)
     .eq('id', id);
@@ -1126,7 +1126,7 @@ async function aplicarFiltro() {
   const usuarioFiltro = document.getElementById('filtroUsuario')?.value?.trim();
   const usuarioLogado = JSON.parse(localStorage.getItem('usuarioLogado'));
 
-  let query = supabase
+  let query = supabaseClient
     .from('registros')
     .select('*')
     .order('data', { ascending: false });
@@ -1174,7 +1174,7 @@ async function aplicarFiltro() {
   }).join('');
 }
 
-supabase.auth.onAuthStateChange((event, session) => {
+supabaseClient.auth.onAuthStateChange((event, session) => {
         if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
           verificarLogin();
           carregarListaRegistros();
@@ -1192,7 +1192,7 @@ async function gerarRelatorio() {
   const inicio = dataInicialISO ? new Date(dataInicialISO) : null;
   const fim = dataFinalISO ? new Date(dataFinalISO) : null;
 
-  const { data: registros, error } = await supabase
+  const { data: registros, error } = await supabaseClient
     .from('registros')
     .select('*');
 
@@ -1483,7 +1483,7 @@ async function gerarRelatorioRefeicoesPeriodo() {
   const inicio = new Date(dataInicial);
   const fim = new Date(dataFinal);
   fim.setHours(23, 59, 59, 999);
-  const { data: registros, error } = await supabase
+  const { data: registros, error } = await supabaseClient
     .from('registros')
     .select('dias, nome, user_id')
     .eq('tipo', 'refeicoes');
@@ -1579,7 +1579,7 @@ async function gerarRelatorioRefeicoesPeriodo() {
 async function carregarListaUsuarios() {
   const lista = document.getElementById('listaUsuarios');
   lista.innerHTML = '';
-  const { data, error } = await supabase.auth.getSession();
+  const { data, error } = await supabaseClient.auth.getSession();
   if (error || !data.session) {
     alert('Usuário não autenticado.');
     return;
@@ -1637,7 +1637,7 @@ async function excluirUsuario(user_id) {
   const {
     data: { session },
     error: sessionError
-  } = await supabase.auth.getSession();
+  } = await supabaseClient.auth.getSession();
   if (sessionError || !session) {
     alert('Usuário não autenticado.');
     return;
@@ -1660,7 +1660,7 @@ async function excluirUsuario(user_id) {
 }
 async function alterarPermissao(user_id, permissao, valor) {
   try {
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession();
     if (sessionError || !session) {
       alert('Usuário não autenticado.');
       return;
@@ -1701,7 +1701,7 @@ document.getElementById('formMissionario').addEventListener('submit', async func
     return;
   }
   try {
-    const { data: sessionData, error } = await supabase.auth.getSession();
+    const { data: sessionData, error } = await supabaseClient.auth.getSession();
     const token = sessionData?.session?.access_token;
     if (!token) {
       alert('Usuário não autenticado.');
@@ -1733,7 +1733,7 @@ document.getElementById('formMissionario').addEventListener('submit', async func
     async function abrirModalUsuarios() {
   const lista = document.getElementById('listaUsuariosModal');
   lista.innerHTML = '<li class="list-group-item text-center text-muted">Carregando...</li>';
-  const { data, error } = await supabase.auth.getSession();
+  const { data, error } = await supabaseClient.auth.getSession();
   if (error || !data.session) {
     lista.innerHTML = '<li class="list-group-item text-danger">Usuário não autenticado.</li>';
     return;
@@ -1801,7 +1801,7 @@ document.getElementById('btnEsqueceuSenha')?.addEventListener('click', async fun
   const email = prompt('Digite o seu email para redefinir a senha:');
   if (!email) return;
 
-  const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+  const { data, error } = await supabaseClient.auth.resetPasswordForEmail(email, {
     redirectTo: "https://wecbrasil.github.io/wecbrasil/reset.html"
   });
 
